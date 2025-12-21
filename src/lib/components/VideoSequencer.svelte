@@ -42,13 +42,11 @@
 		const file = target.files?.[0];
 
 		if (file && file.type.startsWith('video/')) {
-			if (instrumentName.trim()) {
-				sequencerActions.addInstrument(instrumentName.trim(), file);
-				instrumentName = '';
-				target.value = '';
-			} else {
-				alert('Veuillez entrer un nom pour l\'instrument');
-			}
+			// Use the provided name, or fallback to filename without extension
+			const name = instrumentName.trim() || file.name.replace(/\.[^/.]+$/, '');
+			sequencerActions.addInstrument(name, file);
+			instrumentName = '';
+			target.value = '';
 		} else {
 			alert('Veuillez sélectionner un fichier vidéo valide');
 		}
@@ -86,7 +84,9 @@
 		if (success) {
 			alert('✅ Vidéo téléchargée avec succès !');
 		} else {
-			alert('❌ Erreur lors du rendu. Vérifiez que le service Docker est lancé:\ndocker-compose -f docker-compose.dev.yml up -d');
+			alert(
+				'❌ Erreur lors du rendu. Vérifiez que le service Docker est lancé:\ndocker-compose -f docker-compose.dev.yml up -d'
+			);
 		}
 	}
 
@@ -108,7 +108,9 @@
 
 				if (success) {
 					console.log('✅ État après import:', $sequencerState);
-					alert(`Projet chargé : ${jsonData.instruments.length} instruments, ${jsonData.clips.length} clips`);
+					alert(
+						`Projet chargé : ${jsonData.instruments.length} instruments, ${jsonData.clips.length} clips`
+					);
 				} else {
 					alert('Erreur lors du chargement du projet');
 				}
@@ -138,12 +140,10 @@
 			<input
 				type="text"
 				bind:value={instrumentName}
-				placeholder="Nom de l'instrument"
+				placeholder="Nom de l'instrument (optionnel)"
 				class="instrument-name-input"
 			/>
-			<button onclick={triggerFileInput} class="add-btn">
-				+ Ajouter Vidéo
-			</button>
+			<button onclick={triggerFileInput} class="add-btn"> + Ajouter Vidéo </button>
 			<button onclick={loadClipsFromFolder} class="load-btn" title="Charger depuis ./clips">
 				📁 Charger Clips
 			</button>
@@ -259,7 +259,9 @@
 		color: white;
 		font-weight: 600;
 		cursor: pointer;
-		transition: transform 0.2s, box-shadow 0.2s;
+		transition:
+			transform 0.2s,
+			box-shadow 0.2s;
 		font-size: 0.9rem;
 	}
 

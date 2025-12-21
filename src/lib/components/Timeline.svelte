@@ -138,7 +138,7 @@
 		} else if (target.classList.contains('track')) {
 			// Créer un nouveau clip
 			isCreatingClip = true;
-			const rect = target.getBoundingClientRect();
+			const rect = tracksContainer.getBoundingClientRect();
 			const x = event.clientX - rect.left + tracksContainer.scrollLeft;
 			newClipStart = Math.floor(x / PIXELS_PER_BEAT);
 			newClipTrack = trackIndex;
@@ -177,7 +177,7 @@
 
 	function deleteClip(clipId: string) {
 		//if (confirm('Supprimer ce clip ?')) {
-			sequencerActions.removeClip(clipId);
+		sequencerActions.removeClip(clipId);
 		//}
 	}
 

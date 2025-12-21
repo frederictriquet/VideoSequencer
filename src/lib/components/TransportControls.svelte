@@ -215,15 +215,15 @@
 	}
 
 	.bpm-input {
-		width: 60px;
-		padding: 0.25rem 0.5rem;
+		width: 80px;
+		padding: 0.25rem 0.5rem 0.25rem 0.75rem;
 		background: #1a1a1a;
 		border: 1px solid #444;
 		border-radius: 3px;
 		color: #ffffff;
 		font-size: 1rem;
 		font-weight: 600;
-		text-align: center;
+		text-align: left;
 		font-family: 'Courier New', monospace;
 	}
 
@@ -232,6 +232,7 @@
 		border-color: #667eea;
 	}
 
+	/* Keep spinner buttons visible */
 	.bpm-input::-webkit-inner-spin-button,
 	.bpm-input::-webkit-outer-spin-button {
 		opacity: 1;
