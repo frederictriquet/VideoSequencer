@@ -34,6 +34,8 @@ class Instrument(BaseModel):
     id: str
     name: str
     gridPosition: int
+    offset: float = 0.0  # Offset de départ dans la vidéo (en secondes)
+    maxDuration: float = 0.0  # Durée maximale utilisable (en secondes, 0 = pas de limite)
 
 class Clip(BaseModel):
     id: str
@@ -116,9 +118,17 @@ async def render_video(
 
         for inst in request.instruments:
             # Chercher d'abord dans les uploads, puis dans ./clips/
-            video_path = uploaded_videos.get(inst.name) or os.path.join(CLIPS_DIR, f"{inst.name}.mp4")
+            video_path = uploaded_videos.get(inst.name)
 
-            if not os.path.exists(video_path):
+            if not video_path:
+                # Chercher avec différentes extensions
+                for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
+                    potential_path = os.path.join(CLIPS_DIR, f"{inst.name}{ext}")
+                    if os.path.exists(potential_path):
+                        video_path = potential_path
+                        break
+
+            if not video_path or not os.path.exists(video_path):
                 print(f"⚠️  Vidéo non trouvée: {inst.name}")
                 continue
 
@@ -127,9 +137,12 @@ async def render_video(
             x = col * cell_width
             y = row * cell_height
 
-            # Extraire la première frame
+            # Utiliser l'offset de l'instrument
+            offset = inst.offset
+
+            # Extraire la frame à l'offset spécifié
             video = VideoFileClip(video_path)
-            static_frame = video.to_ImageClip(0)
+            static_frame = video.to_ImageClip(offset)
             static_frame = static_frame.resized((cell_width, cell_height))
             static_frame = static_frame.with_duration(total_duration)
             static_frame = static_frame.with_position((x, y))
@@ -147,24 +160,42 @@ async def render_video(
                 continue
 
             # Chercher d'abord dans les uploads, puis dans ./clips/
-            video_path = uploaded_videos.get(inst.name) or os.path.join(CLIPS_DIR, f"{inst.name}.mp4")
+            video_path = uploaded_videos.get(inst.name)
 
-            if not os.path.exists(video_path):
+            if not video_path:
+                # Chercher avec différentes extensions
+                for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
+                    potential_path = os.path.join(CLIPS_DIR, f"{inst.name}{ext}")
+                    if os.path.exists(potential_path):
+                        video_path = potential_path
+                        break
+
+            if not video_path or not os.path.exists(video_path):
                 print(f"⚠️  Vidéo non trouvée pour clip: {inst.name}")
                 continue
 
             start_sec = beats_to_seconds(clip.startTime, request.bpm)
-            duration_sec = beats_to_seconds(clip.duration, request.bpm)
+            offset = inst.offset
+            max_duration = inst.maxDuration
 
             row = inst.gridPosition // grid_cols
             col = inst.gridPosition % grid_cols
             x = col * cell_width
             y = row * cell_height
 
-            # Créer le clip
+            # Créer le clip avec offset et maxDuration (indépendant de la durée en beats)
             video = VideoFileClip(video_path)
-            clip_duration = min(duration_sec, video.duration)
-            video = video.subclipped(0, clip_duration)
+            available_duration = video.duration - offset
+
+            # Utiliser la portion définie par offset et maxDuration
+            if max_duration > 0:
+                # Limiter par maxDuration
+                clip_duration = min(max_duration, available_duration)
+            else:
+                # Utiliser toute la vidéo disponible après l'offset
+                clip_duration = available_duration
+
+            video = video.subclipped(offset, offset + clip_duration)
             video = video.resized((cell_width, cell_height))
             video = video.with_start(start_sec)
             video = video.with_position((x, y))

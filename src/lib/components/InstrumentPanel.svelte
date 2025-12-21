@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { sequencerState, sequencerActions } from '$lib/stores/sequencer';
+	import InstrumentPropertiesModal from './InstrumentPropertiesModal.svelte';
+	import type { VideoInstrument } from '$lib/types/sequencer';
+
+	let showPropertiesModal = false;
+	let selectedInstrument: VideoInstrument | null = null;
 
 	function removeInstrument(id: string) {
 		if (confirm('Êtes-vous sûr de vouloir supprimer cet instrument ?')) {
@@ -11,15 +16,35 @@
 		// Ajouter un clip de test de 4 beats à la position 0
 		sequencerActions.addClip(instrumentId, 0, 4, trackIndex);
 	}
+
+	function openInstrumentProperties(instrument: VideoInstrument) {
+		selectedInstrument = instrument;
+		showPropertiesModal = true;
+	}
+
+	function closePropertiesModal() {
+		showPropertiesModal = false;
+		selectedInstrument = null;
+	}
 </script>
 
 <div class="instrument-panel">
 	<h2>Instruments</h2>
 	<div class="instruments-list">
 		{#each $sequencerState.instruments as instrument, index (instrument.id)}
-			<div class="instrument-item" style="border-left: 3px solid {instrument.color}">
+			<div
+				class="instrument-item"
+				style="border-left: 3px solid {instrument.color}"
+				ondblclick={() => openInstrumentProperties(instrument)}
+				title="Double-clic pour éditer les propriétés"
+			>
 				<div class="instrument-info">
-					<div class="instrument-name">{instrument.name}</div>
+					<div class="instrument-name">
+						{instrument.name}
+						{#if instrument.offset > 0}
+							<span class="offset-indicator">+{instrument.offset}s</span>
+						{/if}
+					</div>
 					<div class="instrument-position">Région {instrument.gridPosition + 1}</div>
 				</div>
 				<div class="instrument-actions">
@@ -47,6 +72,10 @@
 		{/each}
 	</div>
 </div>
+
+{#if showPropertiesModal && selectedInstrument}
+	<InstrumentPropertiesModal instrument={selectedInstrument} onClose={closePropertiesModal} />
+{/if}
 
 <style>
 	.instrument-panel {
@@ -104,6 +133,19 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.offset-indicator {
+		display: inline-block;
+		background: rgba(102, 126, 234, 0.3);
+		padding: 0.125rem 0.375rem;
+		border-radius: 3px;
+		font-size: 0.7rem;
+		font-family: 'Courier New', monospace;
+		flex-shrink: 0;
 	}
 
 	.instrument-position {
@@ -124,7 +166,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: background 0.2s, transform 0.1s;
+		transition:
+			background 0.2s,
+			transform 0.1s;
 		flex-shrink: 0;
 	}
 

@@ -5,6 +5,8 @@ export interface VideoInstrument {
 	videoUrl: string | null;
 	color: string;
 	gridPosition: number; // Position dans la grille d'affichage (0-8 pour une grille 3x3)
+	offset: number; // Offset de départ dans la vidéo (en secondes)
+	maxDuration: number; // Durée maximale utilisable de la vidéo (en secondes, 0 = pas de limite)
 }
 
 export interface VideoClip {

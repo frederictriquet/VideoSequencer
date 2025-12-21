@@ -237,7 +237,12 @@
 								background: {track.instrument.color};
 							"
 						>
-							<span class="clip-label">{track.instrument.name}</span>
+							<span class="clip-label">
+								{track.instrument.name}
+								{#if track.instrument.offset > 0}
+									<span class="clip-offset-indicator">+{track.instrument.offset}s</span>
+								{/if}
+							</span>
 							<button class="clip-delete" onclick={() => deleteClip(clip.id)}>×</button>
 						</div>
 					{/each}
@@ -261,12 +266,16 @@
 		display: block;
 		background: #1a1a1a;
 		border-bottom: 2px solid #333;
+		position: sticky;
+		top: 0;
+		z-index: 10;
 	}
 
 	.tracks-wrapper {
 		flex: 1;
 		overflow: auto;
 		background: #0a0a0a;
+		position: relative;
 	}
 
 	.tracks {
@@ -325,6 +334,18 @@
 		text-overflow: ellipsis;
 		flex: 1;
 		pointer-events: none;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.clip-offset-indicator {
+		display: inline-block;
+		background: rgba(255, 255, 255, 0.3);
+		padding: 0.125rem 0.25rem;
+		border-radius: 2px;
+		font-size: 0.65rem;
+		font-family: 'Courier New', monospace;
 	}
 
 	.clip-delete {

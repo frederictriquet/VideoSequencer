@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { sequencerState, playbackState, timeUtils, sequencerActions } from '$lib/stores/sequencer';
+	import {
+		sequencerState,
+		playbackState,
+		timeUtils,
+		sequencerActions
+	} from '$lib/stores/sequencer';
 	import type { VideoInstrument } from '$lib/types/sequencer';
 
 	// Références aux éléments vidéo
@@ -69,8 +74,19 @@
 
 	// Logger les instruments pour debug
 	$: {
-		console.log('📋 Current instruments:', $sequencerState.instruments.map(i => ({ id: i.id, name: i.name, hasUrl: !!i.videoUrl })));
-		console.log('🎬 Current clips:', $sequencerState.clips.map(c => ({ id: c.id, instrumentId: c.instrumentId, start: c.startTime, duration: c.duration })));
+		console.log(
+			'📋 Current instruments:',
+			$sequencerState.instruments.map((i) => ({ id: i.id, name: i.name, hasUrl: !!i.videoUrl }))
+		);
+		console.log(
+			'🎬 Current clips:',
+			$sequencerState.clips.map((c) => ({
+				id: c.id,
+				instrumentId: c.instrumentId,
+				start: c.startTime,
+				duration: c.duration
+			}))
+		);
 	}
 
 	// Mapper les clips actifs avec leur progression
@@ -88,12 +104,23 @@
 	$: {
 		console.log(`🎥 VideoRefs map:`, Array.from(videoRefs.keys()));
 
-		// Si on ne joue pas, arrêter toutes les vidéos
+		// Si on ne joue pas, arrêter toutes les vidéos et afficher la frame à l'offset
 		if (!$sequencerState.isPlaying) {
-			videoRefs.forEach((video) => {
+			videoRefs.forEach((video, instrumentId) => {
+				const instrument = $sequencerState.instruments.find((i) => i.id === instrumentId);
+				const offset = instrument?.offset || 0;
+
 				if (!video.paused) {
 					video.pause();
-					video.currentTime = 0;
+				}
+
+				// Toujours afficher la frame à l'offset quand on ne joue pas
+				try {
+					if (video.currentTime !== offset) {
+						video.currentTime = offset;
+					}
+				} catch (err) {
+					console.warn(`⚠️ Erreur définition currentTime pour ${instrumentId}: ${err}`);
 				}
 			});
 		} else {
@@ -133,17 +160,34 @@
 							video.load();
 						}
 
+						// Trouver l'instrument pour obtenir son offset et maxDuration
+						const instrument = $sequencerState.instruments.find((i) => i.id === clip.instrumentId);
+						const offset = instrument?.offset || 0;
+						const maxDuration = instrument?.maxDuration || 0;
+
 						// Calculer la durée du clip en secondes
-						const clipDurationSeconds = timeUtils.beatsToSeconds(clip.duration, $sequencerState.bpm);
+						const clipDurationSeconds = timeUtils.beatsToSeconds(
+							clip.duration,
+							$sequencerState.bpm
+						);
 
-						// Ajuster la vitesse de lecture pour que la vidéo corresponde à la durée du clip
-						const videoDuration = video.duration || clipDurationSeconds;
-						video.playbackRate = videoDuration / clipDurationSeconds;
+						// Jouer à vitesse normale (1.0) et simplement respecter les offsets
+						try {
+							video.playbackRate = 1.0;
+						} catch (err) {
+							console.warn(`⚠️ Impossible de définir playbackRate: ${err}`);
+						}
 
-						console.log(`⚙️ Clip duration: ${clipDurationSeconds}s, Video duration: ${videoDuration}s, playbackRate: ${video.playbackRate}`);
+						console.log(
+							`⚙️ Clip start: ${clipStart}, duration: ${clip.duration} beats, Offset: ${offset}s, MaxDuration: ${maxDuration}s`
+						);
 
-						// Démarrer depuis le début
-						video.currentTime = 0;
+						// Démarrer depuis l'offset
+						try {
+							video.currentTime = offset;
+						} catch (err) {
+							console.warn(`⚠️ Impossible de définir currentTime: ${err}`);
+						}
 
 						// Démarrer la lecture
 						const playPromise = video.play();
@@ -154,17 +198,37 @@
 								}
 							});
 						}
+					} else {
+						// La vidéo joue déjà pour ce clip, vérifier si elle a atteint sa fin (maxDuration)
+						const instrument = $sequencerState.instruments.find((i) => i.id === clip.instrumentId);
+						const offset = instrument?.offset || 0;
+						const maxDuration = instrument?.maxDuration || 0;
+
+						// Arrêter uniquement si maxDuration est dépassé (pas basé sur les beats du clip)
+						if (maxDuration > 0 && video.currentTime >= offset + maxDuration && !video.paused) {
+							video.pause();
+							video.currentTime = offset;
+						}
 					}
-					// La vidéo joue déjà pour ce clip, on la laisse continuer
 				}
 			});
 
-			// Arrêter les vidéos qui n'ont plus de clips actifs
+			// Arrêter les vidéos qui n'ont plus de clips actifs et qui ont dépassé leur maxDuration
 			videoRefs.forEach((video, instrumentId) => {
 				if (!currentActiveInstruments.has(instrumentId) && !video.paused) {
-					video.pause();
-					video.currentTime = 0;
-					activeClipInfo.delete(instrumentId);
+					const instrument = $sequencerState.instruments.find((i) => i.id === instrumentId);
+					const offset = instrument?.offset || 0;
+					const maxDuration = instrument?.maxDuration || 0;
+
+					// Ne pas arrêter si la vidéo est encore dans sa durée max
+					const shouldContinue = maxDuration === 0 || video.currentTime < offset + maxDuration;
+
+					if (!shouldContinue) {
+						video.pause();
+						video.currentTime = offset;
+						activeClipInfo.delete(instrumentId);
+					}
+					// Sinon, laisser la vidéo continuer de jouer même sans clip actif
 				}
 			});
 		}

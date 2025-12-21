@@ -1,5 +1,10 @@
 import { writable } from 'svelte/store';
-import type { SequencerState, PlaybackState, VideoClip } from '$lib/types/sequencer';
+import type {
+	SequencerState,
+	PlaybackState,
+	VideoClip,
+	VideoInstrument
+} from '$lib/types/sequencer';
 
 // État principal du séquenceur
 const initialState: SequencerState = {
@@ -46,7 +51,7 @@ export const sequencerActions = {
 
 			// Vérifier qu'il reste de la place
 			if (freePositions.length === 0) {
-				console.warn('Grille pleine : impossible d\'ajouter plus d\'instruments');
+				console.warn("Grille pleine : impossible d'ajouter plus d'instruments");
 				return state;
 			}
 
@@ -75,7 +80,9 @@ export const sequencerActions = {
 						videoFile,
 						videoUrl: url,
 						color,
-						gridPosition
+						gridPosition,
+						offset: 0,
+						maxDuration: 0
 					}
 				]
 			};
@@ -128,6 +135,15 @@ export const sequencerActions = {
 		sequencerState.update((state) => ({
 			...state,
 			clips: state.clips.map((clip) => (clip.id === id ? { ...clip, ...updates } : clip))
+		}));
+	},
+
+	updateInstrument: (id: string, updates: Partial<VideoInstrument>) => {
+		sequencerState.update((state) => ({
+			...state,
+			instruments: state.instruments.map((inst) =>
+				inst.id === id ? { ...inst, ...updates } : inst
+			)
 		}));
 	},
 
@@ -188,7 +204,9 @@ export const sequencerActions = {
 			}
 
 			// Trouver l'instrument à cette position
-			const occupyingInstrument = state.instruments.find((inst) => inst.gridPosition === newPosition);
+			const occupyingInstrument = state.instruments.find(
+				(inst) => inst.gridPosition === newPosition
+			);
 			const movingInstrument = state.instruments.find((inst) => inst.id === instrumentId);
 
 			if (!movingInstrument) return state;
@@ -231,7 +249,9 @@ export const sequencerActions = {
 
 			// Si on réduit, vérifier que tous les instruments tiennent dans la nouvelle grille
 			if (currentMaxPosition >= newTotalCells) {
-				console.warn('Impossible de réduire: des instruments occupent des positions qui seraient supprimées');
+				console.warn(
+					'Impossible de réduire: des instruments occupent des positions qui seraient supprimées'
+				);
 				return state;
 			}
 
@@ -253,7 +273,9 @@ export const sequencerActions = {
 				id: inst.id,
 				name: inst.name,
 				color: inst.color,
-				gridPosition: inst.gridPosition
+				gridPosition: inst.gridPosition,
+				offset: inst.offset || 0,
+				maxDuration: inst.maxDuration || 0
 			})),
 			clips: state.clips.map((clip) => ({
 				id: clip.id,
@@ -308,7 +330,9 @@ export const sequencerActions = {
 						color: inst.color,
 						gridPosition: inst.gridPosition,
 						videoFile: null,
-						videoUrl
+						videoUrl,
+						offset: inst.offset || 0,
+						maxDuration: inst.maxDuration || 0
 					};
 				});
 
@@ -327,7 +351,7 @@ export const sequencerActions = {
 
 			return true;
 		} catch (err) {
-			console.error('Erreur lors de l\'import:', err);
+			console.error("Erreur lors de l'import:", err);
 			return false;
 		}
 	},
@@ -383,21 +407,41 @@ clips = []
 
 		// Générer le code pour chaque clip
 		state.clips.forEach((clip, idx) => {
-			const inst = state.instruments.find(i => i.id === clip.instrumentId);
+			const inst = state.instruments.find((i) => i.id === clip.instrumentId);
 			if (!inst) return;
 
 			const startSec = timeUtils.beatsToSeconds(clip.startTime, state.bpm);
-			const durationSec = timeUtils.beatsToSeconds(clip.duration, state.bpm);
+			const offset = inst.offset || 0;
+			const maxDuration = inst.maxDuration || 0;
 
 			const row = Math.floor(inst.gridPosition / gridCols);
 			const col = inst.gridPosition % gridCols;
 			const x = col * cellWidth;
 			const y = row * cellHeight;
 
-			script += `# Clip ${idx + 1}: ${inst.name} aux beats ${clip.startTime}-${clip.startTime + clip.duration}\n`;
-			script += `video${idx} = VideoFileClip(f"{CLIPS_DIR}/${inst.name}.mp4")\n`;
-			script += `clip_duration${idx} = min(${durationSec.toFixed(3)}, video${idx}.duration)\n`;
-			script += `video${idx} = video${idx}.subclipped(0, clip_duration${idx})\n`;
+			script += `# Clip ${idx + 1}: ${inst.name} au beat ${clip.startTime}${offset > 0 ? ` (offset: ${offset}s)` : ''}${maxDuration > 0 ? ` (max: ${maxDuration}s)` : ''}\n`;
+			script += `# Chercher le fichier vidéo avec différentes extensions\n`;
+			script += `video_path${idx} = None\n`;
+			script += `for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:\n`;
+			script += `    potential = f"{CLIPS_DIR}/${inst.name}" + ext\n`;
+			script += `    if os.path.exists(potential):\n`;
+			script += `        video_path${idx} = potential\n`;
+			script += `        break\n`;
+			script += `if not video_path${idx}:\n`;
+			script += `    print(f"⚠️  Vidéo non trouvée: ${inst.name}")\n`;
+			script += `    continue\n`;
+			script += `video${idx} = VideoFileClip(video_path${idx})\n`;
+
+			// Utiliser la portion définie par offset et maxDuration, indépendamment de la durée en beats
+			if (maxDuration > 0) {
+				// Durée limitée par maxDuration
+				script += `clip_duration${idx} = min(${maxDuration.toFixed(3)}, video${idx}.duration - ${offset.toFixed(3)})\n`;
+			} else {
+				// Utiliser toute la vidéo disponible après l'offset
+				script += `clip_duration${idx} = video${idx}.duration - ${offset.toFixed(3)}\n`;
+			}
+
+			script += `video${idx} = video${idx}.subclipped(${offset.toFixed(3)}, ${offset.toFixed(3)} + clip_duration${idx})\n`;
 			script += `video${idx} = video${idx}.resized((${cellWidth}, ${cellHeight}))\n`;
 			script += `video${idx} = video${idx}.with_start(${startSec.toFixed(3)})\n`;
 			script += `video${idx} = video${idx}.with_position((${x}, ${y}))\n`;
@@ -417,13 +461,23 @@ static_frames = []
 			const x = col * cellWidth;
 			const y = row * cellHeight;
 
-			script += `# Frame fixe pour ${inst.name}\n`;
-			script += `static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')} = VideoFileClip(f"{CLIPS_DIR}/${inst.name}.mp4")\n`;
-			script += `static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')} = static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')}.to_ImageClip(0)\n`;
-			script += `static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')} = static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')}.resized((${cellWidth}, ${cellHeight}))\n`;
-			script += `static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')} = static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')}.with_duration(DURATION)\n`;
-			script += `static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')} = static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')}.with_position((${x}, ${y}))\n`;
-			script += `static_frames.append(static_${inst.name.replace(/[^a-zA-Z0-9]/g, '_')})\n\n`;
+			const offset = inst.offset || 0;
+			const varName = inst.name.replace(/[^a-zA-Z0-9]/g, '_');
+
+			script += `# Frame fixe pour ${inst.name}${offset > 0 ? ` (offset: ${offset}s)` : ''}\n`;
+			script += `static_path_${varName} = None\n`;
+			script += `for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:\n`;
+			script += `    potential = f"{CLIPS_DIR}/${inst.name}" + ext\n`;
+			script += `    if os.path.exists(potential):\n`;
+			script += `        static_path_${varName} = potential\n`;
+			script += `        break\n`;
+			script += `if static_path_${varName}:\n`;
+			script += `    static_${varName} = VideoFileClip(static_path_${varName})\n`;
+			script += `    static_${varName} = static_${varName}.to_ImageClip(${offset.toFixed(3)})\n`;
+			script += `    static_${varName} = static_${varName}.resized((${cellWidth}, ${cellHeight}))\n`;
+			script += `    static_${varName} = static_${varName}.with_duration(DURATION)\n`;
+			script += `    static_${varName} = static_${varName}.with_position((${x}, ${y}))\n`;
+			script += `    static_frames.append(static_${varName})\n\n`;
 		});
 
 		script += `# Composer: fond noir + frames fixes + clips animés
@@ -466,12 +520,14 @@ print(f"Fichier: {output_file}")
 			const renderData = {
 				bpm: state.bpm,
 				gridSize: state.gridSize,
-				instruments: state.instruments.map(inst => ({
+				instruments: state.instruments.map((inst) => ({
 					id: inst.id,
 					name: inst.name,
-					gridPosition: inst.gridPosition
+					gridPosition: inst.gridPosition,
+					offset: inst.offset || 0,
+					maxDuration: inst.maxDuration || 0
 				})),
-				clips: state.clips.map(clip => ({
+				clips: state.clips.map((clip) => ({
 					id: clip.id,
 					instrumentId: clip.instrumentId,
 					startTime: clip.startTime,
@@ -484,7 +540,7 @@ print(f"Fichier: {output_file}")
 			formData.append('data', JSON.stringify(renderData));
 
 			// Ajouter les vidéos qui ont été uploadées (pas celles de ./clips/)
-			const uploadedVideos = state.instruments.filter(inst => inst.videoFile !== null);
+			const uploadedVideos = state.instruments.filter((inst) => inst.videoFile !== null);
 			for (const inst of uploadedVideos) {
 				if (inst.videoFile) {
 					// Créer un nouveau fichier avec le bon nom (nom de l'instrument + extension)
@@ -496,7 +552,9 @@ print(f"Fichier: {output_file}")
 				}
 			}
 
-			console.log(`📤 Envoi de ${uploadedVideos.length} vidéos uploadées + ${state.instruments.length - uploadedVideos.length} vidéos locales`);
+			console.log(
+				`📤 Envoi de ${uploadedVideos.length} vidéos uploadées + ${state.instruments.length - uploadedVideos.length} vidéos locales`
+			);
 
 			// Appeler l'API de rendu
 			const response = await fetch('/api/render', {
