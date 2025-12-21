@@ -1,0 +1,16 @@
+
+services:
+  render:
+    build:
+      context: ./render-service
+      dockerfile: Dockerfile
+    container_name: VideoSequencer-render-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./clips:/app/clips:ro
+      - ./output:/app/output
+      - ./render-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload

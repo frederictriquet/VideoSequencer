@@ -1,0 +1,61 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Testing
+/coverage
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Mutation Testing
+.stryker-tmp/
+reports/
+
+# Docker & Traefik
+traefik/acme.json
+
+/output/
+
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+.venv/
+venv/
+ENV/
+
+# VideoSequencer specific
+/output/
+/clips/*.mp4
+/clips/*.webm
+/clips/*.mov
+render-videoSeq.py
+render-videoSeq.sh
+
+# Python virtual environments
+render-service/.venv/
+render-service/__pycache__/
+render-service/*.pyc
