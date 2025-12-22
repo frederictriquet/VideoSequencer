@@ -48,37 +48,41 @@ test.describe('VideoSequencer - Video Sequencer', () => {
 	});
 
 	test('can increase grid rows', async ({ page }) => {
-		// Trouver le bouton + pour les lignes
+		// Trouver les boutons - et + pour les lignes
+		const decreaseRowsBtn = page.locator('.control-buttons').first().locator('button').first();
 		const increaseRowsBtn = page.locator('.control-buttons').first().locator('button').last();
 
-		// Vérifier la valeur initiale
-		await expect(page.getByText('Grille: 2×2')).toBeVisible();
+		// Vérifier la valeur initiale (3×3)
+		await expect(page.getByText('Grille: 3×3')).toBeVisible();
 
-		// Cliquer sur +
+		// Diminuer puis augmenter pour tester
+		await decreaseRowsBtn.click();
+		await expect(page.getByText('Grille: 3×2')).toBeVisible();
+
 		await increaseRowsBtn.click();
-
-		// Vérifier la nouvelle valeur
-		await expect(page.getByText('Grille: 2×3')).toBeVisible();
+		await expect(page.getByText('Grille: 3×3')).toBeVisible();
 	});
 
 	test('can increase grid columns', async ({ page }) => {
-		// Trouver le bouton + pour les colonnes
+		// Trouver les boutons - et + pour les colonnes
+		const decreaseColsBtn = page.locator('.control-buttons').nth(1).locator('button').first();
 		const increaseColsBtn = page.locator('.control-buttons').nth(1).locator('button').last();
 
-		// Vérifier la valeur initiale
-		await expect(page.getByText('Grille: 2×2')).toBeVisible();
+		// Vérifier la valeur initiale (3×3)
+		await expect(page.getByText('Grille: 3×3')).toBeVisible();
 
-		// Cliquer sur +
+		// Diminuer puis augmenter pour tester
+		await decreaseColsBtn.click();
+		await expect(page.getByText('Grille: 2×3')).toBeVisible();
+
 		await increaseColsBtn.click();
-
-		// Vérifier la nouvelle valeur
-		await expect(page.getByText('Grille: 3×2')).toBeVisible();
+		await expect(page.getByText('Grille: 3×3')).toBeVisible();
 	});
 
 	test('displays video grid with correct number of cells', async ({ page }) => {
-		// Grille 2x2 = 4 cellules
+		// Grille 3x3 = 9 cellules (défaut)
 		const cells = page.locator('.grid-cell');
-		await expect(cells).toHaveCount(4);
+		await expect(cells).toHaveCount(9);
 	});
 
 	test('can toggle loop mode', async ({ page }) => {
@@ -149,15 +153,15 @@ test.describe('VideoSequencer - Video Sequencer', () => {
 	});
 
 	test('video grid adjusts to grid size changes', async ({ page }) => {
-		// Augmenter à 3x3
+		// Augmenter de 3×3 à 4×4
 		const increaseRowsBtn = page.locator('.control-buttons').first().locator('button').last();
 		const increaseColsBtn = page.locator('.control-buttons').nth(1).locator('button').last();
 
 		await increaseRowsBtn.click();
 		await increaseColsBtn.click();
 
-		// Grille 3x3 = 9 cellules
+		// Grille 4x4 = 16 cellules
 		const cells = page.locator('.grid-cell');
-		await expect(cells).toHaveCount(9);
+		await expect(cells).toHaveCount(16);
 	});
 });

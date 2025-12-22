@@ -26,7 +26,7 @@ describe('sequencerState', () => {
 			currentTime: 0,
 			bpm: 120,
 			totalBeats: 64,
-			gridSize: { rows: 2, cols: 2 },
+			gridSize: { rows: 3, cols: 3 },
 			loopMode: false
 		});
 	});
@@ -219,8 +219,8 @@ describe('sequencerState', () => {
 			sequencerActions.moveInstrumentToPosition(inst1Id, 1);
 
 			const state2 = get(sequencerState);
-			const inst1After = state2.instruments.find(i => i.id === inst1Id);
-			const inst2After = state2.instruments.find(i => i.id === inst2Id);
+			const inst1After = state2.instruments.find((i) => i.id === inst1Id);
+			const inst2After = state2.instruments.find((i) => i.id === inst2Id);
 
 			expect(inst1After?.gridPosition).toBe(1);
 			expect(inst2After?.gridPosition).toBe(0);
