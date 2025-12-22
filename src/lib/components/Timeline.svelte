@@ -23,6 +23,12 @@
 	let newClipTrack = 0;
 	let newClipInstrumentId = '';
 
+	// État de la touche Shift
+	let isShiftPressed = false;
+
+	// Position du curseur pour la ligne de guide
+	let cursorBeat = -1;
+
 	// Trier les instruments par gridPosition pour que les tracks correspondent à la grille
 	$: tracks = [...$sequencerState.instruments]
 		.sort((a, b) => a.gridPosition - b.gridPosition)
@@ -85,17 +91,27 @@
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 		// Grille des beats
-		ctx.strokeStyle = '#333';
-		ctx.lineWidth = 1;
-
 		for (let beat = 0; beat <= $sequencerState.totalBeats; beat++) {
 			const x = beat * PIXELS_PER_BEAT;
 
-			// Ligne verticale
+			// Ligne verticale pour beats entiers
+			ctx.strokeStyle = '#333';
+			ctx.lineWidth = 1;
 			ctx.beginPath();
 			ctx.moveTo(x, 0);
 			ctx.lineTo(x, canvas.height);
 			ctx.stroke();
+
+			// Ligne pour demi-beat (plus légère)
+			if (beat < $sequencerState.totalBeats) {
+				const halfX = x + PIXELS_PER_BEAT / 2;
+				ctx.strokeStyle = '#222';
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(halfX, 0);
+				ctx.lineTo(halfX, canvas.height);
+				ctx.stroke();
+			}
 
 			// Numéro de beat
 			if (beat % 4 === 0) {
@@ -119,7 +135,11 @@
 		if (!timelineCanvas) return;
 		const rect = timelineCanvas.getBoundingClientRect();
 		const x = event.clientX - rect.left + tracksContainer.scrollLeft;
-		const beat = x / PIXELS_PER_BEAT;
+		let beat = x / PIXELS_PER_BEAT;
+
+		// Toujours arrondir au demi-beat le plus proche
+		beat = Math.round(beat * 2) / 2;
+
 		sequencerActions.setCurrentTime(beat);
 	}
 
@@ -140,7 +160,11 @@
 			isCreatingClip = true;
 			const rect = tracksContainer.getBoundingClientRect();
 			const x = event.clientX - rect.left + tracksContainer.scrollLeft;
-			newClipStart = Math.floor(x / PIXELS_PER_BEAT);
+			let beat = x / PIXELS_PER_BEAT;
+
+			// Toujours arrondir au demi-beat le plus proche
+			newClipStart = Math.round(beat * 2) / 2;
+
 			newClipTrack = trackIndex;
 			newClipInstrumentId = instrumentId;
 		}
@@ -149,9 +173,33 @@
 	function handleMouseMove(event: MouseEvent) {
 		if (isDragging && draggedClipId) {
 			const deltaX = event.clientX - dragStartX;
-			const deltaBeat = deltaX / PIXELS_PER_BEAT;
-			const newStartTime = Math.max(0, dragStartBeat + deltaBeat);
-			sequencerActions.updateClip(draggedClipId, { startTime: newStartTime });
+			let deltaBeat = deltaX / PIXELS_PER_BEAT;
+			let newStartTime = dragStartBeat + deltaBeat;
+
+			// Toujours arrondir au demi-beat le plus proche
+			newStartTime = Math.round(newStartTime * 2) / 2;
+			newStartTime = Math.max(0, newStartTime);
+
+			// Vérifier qu'il n'y a pas de chevauchement
+			const currentClip = $sequencerState.clips.find((c) => c.id === draggedClipId);
+			if (currentClip) {
+				const newClipEnd = newStartTime + currentClip.duration;
+				const hasOverlap = $sequencerState.clips.some((clip) => {
+					if (clip.id === draggedClipId || clip.instrumentId !== currentClip.instrumentId)
+						return false;
+
+					const clipEnd = clip.startTime + clip.duration;
+					return (
+						(newStartTime >= clip.startTime && newStartTime < clipEnd) ||
+						(newClipEnd > clip.startTime && newClipEnd <= clipEnd) ||
+						(newStartTime <= clip.startTime && newClipEnd >= clipEnd)
+					);
+				});
+
+				if (!hasOverlap) {
+					sequencerActions.updateClip(draggedClipId, { startTime: newStartTime });
+				}
+			}
 		}
 	}
 
@@ -160,13 +208,36 @@
 			// Finaliser la création du clip
 			const rect = tracksContainer.getBoundingClientRect();
 			const x = event.clientX - rect.left + tracksContainer.scrollLeft;
-			const endBeat = Math.floor(x / PIXELS_PER_BEAT);
-			const duration = Math.max(1, endBeat - newClipStart);
+			let endBeat = x / PIXELS_PER_BEAT;
 
-			// Obtenir la durée réelle de la vidéo
-			const instrument = $sequencerState.instruments.find((i) => i.id === newClipInstrumentId);
-			if (instrument) {
-				sequencerActions.addClip(newClipInstrumentId, newClipStart, duration, newClipTrack);
+			// Toujours arrondir au demi-beat le plus proche
+			endBeat = Math.round(endBeat * 2) / 2;
+
+			const duration = Math.max(0.5, endBeat - newClipStart);
+
+			// Vérifier qu'il n'y a pas de chevauchement avec un clip existant
+			const hasOverlap = $sequencerState.clips.some((clip) => {
+				if (clip.instrumentId !== newClipInstrumentId) return false;
+
+				const clipEnd = clip.startTime + clip.duration;
+				const newClipEnd = newClipStart + duration;
+
+				// Vérifier le chevauchement
+				return (
+					(newClipStart >= clip.startTime && newClipStart < clipEnd) ||
+					(newClipEnd > clip.startTime && newClipEnd <= clipEnd) ||
+					(newClipStart <= clip.startTime && newClipEnd >= clipEnd)
+				);
+			});
+
+			if (hasOverlap) {
+				console.warn('⚠️ Impossible de créer le clip : chevauchement détecté');
+			} else {
+				// Obtenir la durée réelle de la vidéo
+				const instrument = $sequencerState.instruments.find((i) => i.id === newClipInstrumentId);
+				if (instrument) {
+					sequencerActions.addClip(newClipInstrumentId, newClipStart, duration, newClipTrack);
+				}
 			}
 		}
 
@@ -179,6 +250,18 @@
 		//if (confirm('Supprimer ce clip ?')) {
 		sequencerActions.removeClip(clipId);
 		//}
+	}
+
+	function handleTracksMouseMove(event: MouseEvent) {
+		if (!tracksContainer) return;
+		const rect = tracksContainer.getBoundingClientRect();
+		const x = event.clientX - rect.left + tracksContainer.scrollLeft;
+		const beat = x / PIXELS_PER_BEAT;
+		cursorBeat = Math.floor(beat * 2) / 2; // Aligner sur le début du demi-beat
+	}
+
+	function handleTracksMouseLeave() {
+		cursorBeat = -1;
 	}
 
 	onMount(() => {
@@ -210,7 +293,12 @@
 </script>
 
 <div class="timeline-container">
-	<div class="tracks-wrapper" bind:this={tracksContainer}>
+	<div
+		class="tracks-wrapper"
+		bind:this={tracksContainer}
+		onmousemove={handleTracksMouseMove}
+		onmouseleave={handleTracksMouseLeave}
+	>
 		<canvas
 			bind:this={timelineCanvas}
 			width={timelineWidth}
@@ -218,6 +306,10 @@
 			class="timeline-canvas"
 			onclick={handleTimelineClick}
 		></canvas>
+
+		{#if cursorBeat >= 0}
+			<div class="cursor-guide" style="left: {cursorBeat * PIXELS_PER_BEAT}px;"></div>
+		{/if}
 
 		<div class="tracks" style="width: {timelineWidth}px;">
 			{#each tracks as track (track.instrument.id)}
@@ -276,6 +368,17 @@
 		overflow: auto;
 		background: #0a0a0a;
 		position: relative;
+	}
+
+	.cursor-guide {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 1px;
+		background: rgba(102, 126, 234, 0.5);
+		pointer-events: none;
+		z-index: 5;
+		box-shadow: 0 0 4px rgba(102, 126, 234, 0.3);
 	}
 
 	.tracks {
@@ -349,20 +452,21 @@
 	}
 
 	.clip-delete {
-		width: 20px;
-		height: 20px;
+		width: 16px;
+		height: 16px;
 		background: rgba(255, 255, 255, 0.2);
 		border: none;
 		border-radius: 50%;
 		color: white;
-		font-size: 1rem;
-		line-height: 1;
+		font-size: 0.85rem;
 		cursor: pointer;
 		display: none;
 		align-items: center;
 		justify-content: center;
 		transition: background 0.2s;
-		margin-left: 4px;
+		margin-left: auto;
+		padding: 0;
+		flex-shrink: 0;
 	}
 
 	.clip:hover .clip-delete {
