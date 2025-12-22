@@ -11,6 +11,7 @@ from moviepy import VideoFileClip, ColorClip, CompositeVideoClip
 import os
 import tempfile
 import json
+import subprocess
 from datetime import datetime
 from typing import List, Optional
 
@@ -58,6 +59,34 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 def beats_to_seconds(beats: float, bpm: int) -> float:
     return (beats / bpm) * 60
+
+def precise_cut_video(input_path: str, start_time: float, duration: float, output_path: str) -> bool:
+    """
+    Découpe une vidéo avec précision frame-parfaite en utilisant ffmpeg directement
+    Retourne True si succès, False sinon
+    """
+    try:
+        # Utiliser ffmpeg pour un découpage précis
+        # -ss avant -i pour seek rapide, -t pour la durée
+        # -c copy ne fonctionne pas pour découpage précis, on doit réencoder
+        cmd = [
+            'ffmpeg', '-y',
+            '-ss', str(start_time),  # Seek au timestamp exact
+            '-i', input_path,
+            '-t', str(duration),  # Durée exacte
+            '-c:v', 'libx264',  # Réencodage nécessaire pour précision frame
+            '-preset', 'ultrafast',  # Rapide pour le rendu
+            '-crf', '18',  # Qualité élevée
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            output_path
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception as e:
+        print(f"❌ Erreur ffmpeg: {e}")
+        return False
 
 @app.get("/")
 def root():
@@ -195,11 +224,40 @@ async def render_video(
                 # Utiliser toute la vidéo disponible après l'offset
                 clip_duration = available_duration
 
-            video = video.subclipped(offset, offset + clip_duration)
-            video = video.resized((cell_width, cell_height))
-            video = video.with_start(start_sec)
-            video = video.with_position((x, y))
-            animated_clips.append(video)
+            # Debug logging pour diagnostic
+            print(f"  📊 Clip {clip.id} (instrument: {inst.name}):")
+            print(f"     - startTime (beats): {clip.startTime}")
+            print(f"     - start_sec (calculé): {start_sec:.3f}s")
+            print(f"     - offset: {offset:.3f}s")
+            print(f"     - max_duration: {max_duration:.3f}s")
+            print(f"     - video.duration: {video.duration:.3f}s")
+            print(f"     - available_duration: {available_duration:.3f}s")
+            print(f"     - clip_duration (final): {clip_duration:.3f}s")
+            print(f"     - position grid: ({row}, {col}) → coords: ({x}, {y})")
+
+            # Découper la vidéo avec ffmpeg pour précision frame-parfaite
+            print(f"     - Découpage précis avec ffmpeg: de {offset:.3f}s, durée {clip_duration:.3f}s")
+
+            # Créer un fichier temporaire pour le clip découpé
+            temp_cut_path = os.path.join(TEMP_DIR, f"cut_{clip.id}.mp4")
+
+            # Découper avec ffmpeg (précision frame-parfaite)
+            success = precise_cut_video(video_path, offset, clip_duration, temp_cut_path)
+
+            if not success:
+                print(f"⚠️  Échec découpage ffmpeg pour clip {clip.id}")
+                continue
+
+            # Charger le clip pré-découpé dans MoviePy
+            video_cut = VideoFileClip(temp_cut_path)
+            print(f"     - Clip découpé chargé, durée réelle: {video_cut.duration:.3f}s")
+
+            video_cut = video_cut.resized((cell_width, cell_height))
+            video_cut = video_cut.with_start(start_sec)
+            video_cut = video_cut.with_position((x, y))
+
+            print(f"     - Clip ajouté à la position {start_sec:.3f}s dans la composition")
+            animated_clips.append(video_cut)
 
         # Composer
         print("Composition finale...")
@@ -214,6 +272,9 @@ async def render_video(
 
         # Rendu
         print(f"Rendu vers: {output_path}")
+        # Utiliser des paramètres ffmpeg pour forcer la précision du découpage
+        # -avoid_negative_ts make_zero: évite les timestamps négatifs
+        # -copyts: préserve les timestamps originaux
         final.write_videofile(
             output_path,
             fps=30,
@@ -221,6 +282,7 @@ async def render_video(
             audio_codec='aac',
             bitrate='5000k',
             preset='medium',
+            ffmpeg_params=['-avoid_negative_ts', 'make_zero'],
             logger=None  # Désactiver les logs verbeux
         )
 
