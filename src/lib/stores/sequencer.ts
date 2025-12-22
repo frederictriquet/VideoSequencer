@@ -14,7 +14,7 @@ const initialState: SequencerState = {
 	currentTime: 0,
 	bpm: 120,
 	totalBeats: 64, // 16 mesures de 4 temps par défaut
-	gridSize: { rows: 2, cols: 2 },
+	gridSize: { rows: 3, cols: 3 },
 	loopMode: false
 };
 
