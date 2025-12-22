@@ -124,12 +124,18 @@
 		}
 	}
 
+	// Version et build info (injectés par Vite au build)
+	const appVersion = import.meta.env.VITE_APP_VERSION;
+	const buildTimestamp = import.meta.env.VITE_BUILD_TIMESTAMP;
+
 	// Debug info
 	$: debugInfo = {
 		isPlaying: $sequencerState.isPlaying,
 		currentTime: $sequencerState.currentTime.toFixed(2),
 		clips: $sequencerState.clips.length,
-		instruments: $sequencerState.instruments.length
+		instruments: $sequencerState.instruments.length,
+		version: appVersion,
+		build: buildTimestamp
 	};
 </script>
 
@@ -190,6 +196,8 @@
 				<span>⏱️ Time: {debugInfo.currentTime}</span>
 				<span>🎬 Clips: {debugInfo.clips}</span>
 				<span>🎸 Instruments: {debugInfo.instruments}</span>
+				<span>📦 v{debugInfo.version}</span>
+				<span>🔨 Build: {debugInfo.build}</span>
 			</div>
 		</div>
 	</div>

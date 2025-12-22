@@ -8,7 +8,7 @@
 	let { children } = $props();
 
 	// Build timestamp from Vite
-	const buildTimestamp = __BUILD_TIMESTAMP__;
+	const buildTimestamp = import.meta.env.VITE_BUILD_TIMESTAMP;
 	const buildDate = new Date(buildTimestamp);
 
 	// Format the build timestamp
@@ -109,7 +109,9 @@
 		border-radius: 0.375rem;
 		font-weight: 600;
 		cursor: pointer;
-		transition: transform 0.2s, box-shadow 0.2s;
+		transition:
+			transform 0.2s,
+			box-shadow 0.2s;
 		font-size: 0.9rem;
 	}
 

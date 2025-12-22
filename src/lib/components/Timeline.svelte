@@ -137,8 +137,8 @@
 		const x = event.clientX - rect.left + tracksContainer.scrollLeft;
 		let beat = x / PIXELS_PER_BEAT;
 
-		// Toujours arrondir au demi-beat le plus proche
-		beat = Math.round(beat * 2) / 2;
+		// Aligner sur le début du demi-beat (comme la ligne de guide)
+		beat = Math.floor(beat * 2) / 2;
 
 		sequencerActions.setCurrentTime(beat);
 	}
@@ -162,8 +162,8 @@
 			const x = event.clientX - rect.left + tracksContainer.scrollLeft;
 			let beat = x / PIXELS_PER_BEAT;
 
-			// Toujours arrondir au demi-beat le plus proche
-			newClipStart = Math.round(beat * 2) / 2;
+			// Aligner sur le début du demi-beat (comme la ligne de guide)
+			newClipStart = Math.floor(beat * 2) / 2;
 
 			newClipTrack = trackIndex;
 			newClipInstrumentId = instrumentId;
@@ -176,8 +176,8 @@
 			let deltaBeat = deltaX / PIXELS_PER_BEAT;
 			let newStartTime = dragStartBeat + deltaBeat;
 
-			// Toujours arrondir au demi-beat le plus proche
-			newStartTime = Math.round(newStartTime * 2) / 2;
+			// Aligner sur le début du demi-beat (comme la ligne de guide)
+			newStartTime = Math.floor(newStartTime * 2) / 2;
 			newStartTime = Math.max(0, newStartTime);
 
 			// Vérifier qu'il n'y a pas de chevauchement
@@ -210,8 +210,8 @@
 			const x = event.clientX - rect.left + tracksContainer.scrollLeft;
 			let endBeat = x / PIXELS_PER_BEAT;
 
-			// Toujours arrondir au demi-beat le plus proche
-			endBeat = Math.round(endBeat * 2) / 2;
+			// Aligner sur le début du demi-beat (comme la ligne de guide)
+			endBeat = Math.floor(endBeat * 2) / 2;
 
 			const duration = Math.max(0.5, endBeat - newClipStart);
 
@@ -307,11 +307,13 @@
 			onclick={handleTimelineClick}
 		></canvas>
 
-		{#if cursorBeat >= 0}
-			<div class="cursor-guide" style="left: {cursorBeat * PIXELS_PER_BEAT}px;"></div>
-		{/if}
-
 		<div class="tracks" style="width: {timelineWidth}px;">
+			{#if cursorBeat >= 0}
+				<div
+					class="cursor-guide"
+					style="left: {cursorBeat * PIXELS_PER_BEAT}px; height: {tracks.length * TRACK_HEIGHT}px;"
+				></div>
+			{/if}
 			{#each tracks as track (track.instrument.id)}
 				<div
 					class="track"
@@ -373,7 +375,6 @@
 	.cursor-guide {
 		position: absolute;
 		top: 0;
-		bottom: 0;
 		width: 1px;
 		background: rgba(102, 126, 234, 0.5);
 		pointer-events: none;
@@ -383,6 +384,7 @@
 
 	.tracks {
 		min-width: 100%;
+		position: relative;
 	}
 
 	.track {
