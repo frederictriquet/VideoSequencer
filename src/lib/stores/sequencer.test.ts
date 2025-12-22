@@ -56,15 +56,20 @@ describe('sequencerState', () => {
 		});
 
 		it('prevents adding more instruments than grid cells', () => {
-			// Grille 2x2 = 4 cellules max
+			// Grille 3x3 = 9 cellules max
 			sequencerActions.addInstrument('Inst1', null, 'url1');
 			sequencerActions.addInstrument('Inst2', null, 'url2');
 			sequencerActions.addInstrument('Inst3', null, 'url3');
 			sequencerActions.addInstrument('Inst4', null, 'url4');
-			sequencerActions.addInstrument('Inst5', null, 'url5'); // Devrait être ignoré
+			sequencerActions.addInstrument('Inst5', null, 'url5');
+			sequencerActions.addInstrument('Inst6', null, 'url6');
+			sequencerActions.addInstrument('Inst7', null, 'url7');
+			sequencerActions.addInstrument('Inst8', null, 'url8');
+			sequencerActions.addInstrument('Inst9', null, 'url9');
+			sequencerActions.addInstrument('Inst10', null, 'url10'); // Devrait être ignoré
 
 			const state = get(sequencerState);
-			expect(state.instruments).toHaveLength(4);
+			expect(state.instruments).toHaveLength(9);
 		});
 	});
 
@@ -245,8 +250,8 @@ describe('sequencerState', () => {
 			sequencerActions.setGridSize(1, 1);
 
 			const state = get(sequencerState);
-			expect(state.gridSize.rows).toBe(2); // Pas changé
-			expect(state.gridSize.cols).toBe(2); // Pas changé
+			expect(state.gridSize.rows).toBe(3); // Pas changé
+			expect(state.gridSize.cols).toBe(3); // Pas changé
 		});
 
 		it('allows reducing grid size when positions are free', () => {
