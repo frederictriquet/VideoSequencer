@@ -82,7 +82,15 @@ def precise_cut_video(input_path: str, start_time: float, duration: float, outpu
             output_path
         ]
 
+        # Afficher la commande complète pour debug
+        cmd_str = ' '.join(cmd)
+        print(f"     🔧 Commande ffmpeg: {cmd_str}")
+
         result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            print(f"     ❌ Erreur ffmpeg stderr: {result.stderr}")
+
         return result.returncode == 0
     except Exception as e:
         print(f"❌ Erreur ffmpeg: {e}")

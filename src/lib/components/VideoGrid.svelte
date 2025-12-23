@@ -294,9 +294,9 @@
 		gap: 4px;
 		background: #0a0a0a;
 		padding: 1rem;
-		aspect-ratio: 16 / 9;
 		width: 100%;
-		max-height: 50vh;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.grid-cell {

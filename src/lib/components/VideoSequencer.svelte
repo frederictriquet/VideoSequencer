@@ -10,6 +10,8 @@
 	let fileInput: HTMLInputElement;
 	let jsonFileInput: HTMLInputElement;
 	let instrumentName = '';
+	let showVideoGrid = true;
+	let showTimeline = true;
 
 	async function loadClipsFromFolder() {
 		try {
@@ -162,6 +164,20 @@
 			<button onclick={renderVideo} class="render-btn" title="Générer le rendu vidéo">
 				🎬 Rendu Vidéo
 			</button>
+			<button
+				onclick={() => (showVideoGrid = !showVideoGrid)}
+				class="toggle-grid-btn"
+				title={showVideoGrid ? 'Masquer la grille vidéo' : 'Afficher la grille vidéo'}
+			>
+				{showVideoGrid ? '🔼 Masquer Grille' : '🔽 Afficher Grille'}
+			</button>
+			<button
+				onclick={() => (showTimeline = !showTimeline)}
+				class="toggle-timeline-btn"
+				title={showTimeline ? 'Masquer la timeline' : 'Afficher la timeline'}
+			>
+				{showTimeline ? '🔽 Masquer Timeline' : '🔼 Afficher Timeline'}
+			</button>
 			<input
 				type="file"
 				accept="video/*"
@@ -185,9 +201,20 @@
 			<InstrumentPanel />
 		</div>
 
-		<div class="center-panel">
-			<VideoGrid />
-			<Timeline />
+		<div
+			class="center-panel"
+			class:grid-hidden={!showVideoGrid}
+			class:timeline-hidden={!showTimeline}
+		>
+			<div class="content-area">
+				<div class="grid-wrapper" class:hidden={!showVideoGrid}>
+					<VideoGrid />
+				</div>
+				<div class="timeline-wrapper" class:hidden={!showTimeline}>
+					<Timeline />
+				</div>
+			</div>
+
 			<TransportControls />
 
 			<!-- Debug Panel -->
@@ -372,6 +399,52 @@
 		transform: translateY(0);
 	}
 
+	.toggle-grid-btn {
+		padding: 0.5rem 1.5rem;
+		background: #2a2a2a;
+		border: 1px solid #444;
+		border-radius: 4px;
+		color: white;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 0.9rem;
+	}
+
+	.toggle-grid-btn:hover {
+		background: #333;
+		border-color: #667eea;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+	}
+
+	.toggle-grid-btn:active {
+		transform: translateY(0);
+	}
+
+	.toggle-timeline-btn {
+		padding: 0.5rem 1.5rem;
+		background: #2a2a2a;
+		border: 1px solid #444;
+		border-radius: 4px;
+		color: white;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 0.9rem;
+	}
+
+	.toggle-timeline-btn:hover {
+		background: #333;
+		border-color: #667eea;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+	}
+
+	.toggle-timeline-btn:active {
+		transform: translateY(0);
+	}
+
 	.main-content {
 		flex: 1;
 		display: flex;
@@ -390,6 +463,33 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+
+	.content-area {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		min-height: 0;
+	}
+
+	.grid-wrapper,
+	.timeline-wrapper {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		min-height: 0;
+	}
+
+	.grid-wrapper.hidden,
+	.timeline-wrapper.hidden {
+		position: absolute;
+		left: -9999px;
+		visibility: hidden;
+		flex: 0;
+		min-height: 0;
+		height: 0;
 	}
 
 	.debug-panel {
