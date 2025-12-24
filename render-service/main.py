@@ -51,11 +51,23 @@ class RenderRequest(BaseModel):
     clips: List[Clip]
 
 # Configuration
-CLIPS_DIR = "/app/clips"
-OUTPUT_DIR = "/app/output"
-TEMP_DIR = "/tmp/VideoSequencer_uploads"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(TEMP_DIR, exist_ok=True)
+# Chemins - utiliser des chemins relatifs pour exécution locale
+CLIPS_DIR = os.environ.get('CLIPS_DIR', "/app/clips")
+OUTPUT_DIR = os.environ.get('OUTPUT_DIR', "/app/output")
+TEMP_DIR = os.environ.get('TEMP_DIR', "/tmp/VideoSequencer_uploads")
+
+# Créer les répertoires seulement s'ils n'existent pas et qu'on a les permissions
+try:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(TEMP_DIR, exist_ok=True)
+except OSError as e:
+    print(f"⚠️ Impossible de créer les répertoires: {e}")
+    # Utiliser des chemins locaux si /app n'est pas accessible
+    if not os.path.exists(OUTPUT_DIR):
+        OUTPUT_DIR = "./output"
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    if not os.path.exists(CLIPS_DIR):
+        CLIPS_DIR = "../clips"
 
 def beats_to_seconds(beats: float, bpm: int) -> float:
     return (beats / bpm) * 60
@@ -181,6 +193,8 @@ async def render_video(
             video = VideoFileClip(video_path)
             static_frame = video.to_ImageClip(offset)
             static_frame = static_frame.resized((cell_width, cell_height))
+            # Assombrir l'image statique (30% de luminosité)
+            static_frame = static_frame.image_transform(lambda image: (image * 0.3).astype('uint8'))
             static_frame = static_frame.with_duration(total_duration)
             static_frame = static_frame.with_position((x, y))
             static_frames.append(static_frame)
@@ -189,6 +203,13 @@ async def render_video(
         # Créer les clips animés
         print(f"Création de {len(request.clips)} clips animés...")
         animated_clips = []
+
+        # Cache pour éviter de découper et charger plusieurs fois le même clip
+        # Clé: (instrument_name, offset, duration) -> chemin du fichier découpé
+        cut_clips_cache = {}
+        # Cache des clips MoviePy chargés (pour éviter de charger 332 fois le même fichier)
+        # Clé: chemin du fichier -> VideoFileClip (non redimensionné, non positionné)
+        loaded_clips_cache = {}
 
         for clip in request.clips:
             # Trouver l'instrument correspondant
@@ -201,14 +222,26 @@ async def render_video(
 
             if not video_path:
                 # Chercher avec différentes extensions
+                print(f"     🔍 Recherche vidéo pour: '{inst.name}'")
                 for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
                     potential_path = os.path.join(CLIPS_DIR, f"{inst.name}{ext}")
+                    print(f"        Essai: {potential_path}")
                     if os.path.exists(potential_path):
                         video_path = potential_path
+                        print(f"        ✅ Trouvé!")
                         break
+                    else:
+                        print(f"        ❌ N'existe pas")
 
             if not video_path or not os.path.exists(video_path):
-                print(f"⚠️  Vidéo non trouvée pour clip: {inst.name}")
+                print(f"⚠️  Vidéo non trouvée pour instrument: {inst.name}")
+                print(f"     Fichiers disponibles dans {CLIPS_DIR}:")
+                try:
+                    files = os.listdir(CLIPS_DIR)
+                    for f in sorted(files):
+                        print(f"       - {f}")
+                except Exception as e:
+                    print(f"     Erreur listage: {e}")
                 continue
 
             start_sec = beats_to_seconds(clip.startTime, request.bpm)
@@ -243,29 +276,56 @@ async def render_video(
             print(f"     - clip_duration (final): {clip_duration:.3f}s")
             print(f"     - position grid: ({row}, {col}) → coords: ({x}, {y})")
 
-            # Découper la vidéo avec ffmpeg pour précision frame-parfaite
-            print(f"     - Découpage précis avec ffmpeg: de {offset:.3f}s, durée {clip_duration:.3f}s")
+            # Vérifier si on a déjà découpé ce même clip (même instrument + offset + durée)
+            cache_key = (inst.name, offset, clip_duration)
+            temp_cut_path = cut_clips_cache.get(cache_key)
 
-            # Créer un fichier temporaire pour le clip découpé
-            temp_cut_path = os.path.join(TEMP_DIR, f"cut_{clip.id}.mp4")
+            if temp_cut_path:
+                print(f"     - ♻️ Réutilisation du clip en cache")
+            else:
+                # Découper la vidéo avec ffmpeg pour précision frame-parfaite
+                print(f"     - Découpage précis avec ffmpeg: de {offset:.3f}s, durée {clip_duration:.3f}s")
 
-            # Découper avec ffmpeg (précision frame-parfaite)
-            success = precise_cut_video(video_path, offset, clip_duration, temp_cut_path)
+                # Créer un fichier temporaire pour le clip découpé
+                # Utiliser un nom basé sur le cache_key pour éviter les collisions
+                temp_cut_path = os.path.join(TEMP_DIR, f"cut_{inst.name}_{offset}_{clip_duration}.mp4")
 
-            if not success:
-                print(f"⚠️  Échec découpage ffmpeg pour clip {clip.id}")
-                continue
+                # Découper avec ffmpeg (précision frame-parfaite)
+                success = precise_cut_video(video_path, offset, clip_duration, temp_cut_path)
 
-            # Charger le clip pré-découpé dans MoviePy
-            video_cut = VideoFileClip(temp_cut_path)
-            print(f"     - Clip découpé chargé, durée réelle: {video_cut.duration:.3f}s")
+                if not success:
+                    print(f"⚠️  Échec découpage ffmpeg pour clip {clip.id}")
+                    continue
 
+                # Mettre en cache
+                cut_clips_cache[cache_key] = temp_cut_path
+                print(f"     - ✅ Clip découpé et mis en cache")
+
+            # Charger le clip pré-découpé dans MoviePy (avec cache)
+            if temp_cut_path in loaded_clips_cache:
+                base_clip = loaded_clips_cache[temp_cut_path]
+                print(f"     - ♻️ Clip MoviePy en cache")
+            else:
+                base_clip = VideoFileClip(temp_cut_path)
+                loaded_clips_cache[temp_cut_path] = base_clip
+                print(f"     - Clip chargé dans MoviePy, durée: {base_clip.duration:.3f}s")
+
+            # Créer une instance positionnée et redimensionnée pour ce clip spécifique
+            # Utiliser copy() pour créer une instance indépendante
+            video_cut = base_clip.copy()
             video_cut = video_cut.resized((cell_width, cell_height))
             video_cut = video_cut.with_start(start_sec)
             video_cut = video_cut.with_position((x, y))
 
             print(f"     - Clip ajouté à la position {start_sec:.3f}s dans la composition")
             animated_clips.append(video_cut)
+
+        # Statistiques du cache
+        print(f"\n📊 Statistiques du cache:")
+        print(f"   - Clips traités: {len(request.clips)}")
+        print(f"   - Clips uniques découpés: {len(cut_clips_cache)}")
+        print(f"   - Réutilisations: {len(request.clips) - len(cut_clips_cache)}")
+        print(f"   - Gain: {((len(request.clips) - len(cut_clips_cache)) / len(request.clips) * 100):.1f}%\n")
 
         # Composer
         print("Composition finale...")

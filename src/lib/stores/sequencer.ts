@@ -13,7 +13,7 @@ const initialState: SequencerState = {
 	isPlaying: false,
 	currentTime: 0,
 	bpm: 120,
-	totalBeats: 64, // 16 mesures de 4 temps par défaut
+	totalBeats: 128, // 32 mesures de 4 temps = ~1 minute à 120 BPM
 	gridSize: { rows: 3, cols: 3 },
 	loopMode: false
 };
@@ -298,32 +298,54 @@ export const sequencerActions = {
 
 	importFromJSON: async (jsonData: any) => {
 		try {
+			console.log('🔄 Début importFromJSON');
+
 			// Valider la version
-			if (jsonData.version !== '1.0') {
-				throw new Error('Version de fichier non supportée');
+			if (!jsonData.version) {
+				console.error('❌ Pas de champ "version" dans le JSON');
+				throw new Error('Champ "version" manquant');
 			}
+			if (jsonData.version !== '1.0') {
+				console.error('❌ Version non supportée:', jsonData.version);
+				throw new Error(`Version de fichier non supportée: ${jsonData.version}`);
+			}
+			console.log('✅ Version validée:', jsonData.version);
 
 			// Charger d'abord les vidéos depuis ./clips pour avoir les URLs
+			console.log('📂 Chargement des clips disponibles...');
 			const response = await fetch('/api/clips');
+			if (!response.ok) {
+				console.error('❌ Erreur fetch /api/clips:', response.status);
+				throw new Error(`Erreur chargement clips: ${response.status}`);
+			}
 			const clipsData = await response.json();
-			const availableVideos = new Map<string, string>();
+			console.log('✅ Clips disponibles:', clipsData.files?.length || 0);
 
+			const availableVideos = new Map<string, string>();
 			clipsData.files?.forEach((filename: string) => {
 				const name = filename.replace(/\.[^/.]+$/, '');
 				availableVideos.set(name, `/api/clips/${filename}`);
+				console.log(`   - ${name} → ${filename}`);
 			});
 
 			sequencerState.update((state) => {
+				console.log('🔧 Mise à jour du state...');
+
 				// Nettoyer les anciennes URLs
 				state.instruments.forEach((inst) => {
 					if (inst.videoUrl) {
 						URL.revokeObjectURL(inst.videoUrl);
 					}
 				});
+				console.log('✅ Anciennes URLs nettoyées');
 
 				// Reconstruire les instruments avec les vidéos disponibles
-				const instruments = jsonData.instruments.map((inst: any) => {
+				console.log('🎸 Reconstruction des instruments...');
+				const instruments = jsonData.instruments.map((inst: any, index: number) => {
 					const videoUrl = availableVideos.get(inst.name) || null;
+					console.log(
+						`   ${index + 1}. ${inst.name} (position ${inst.gridPosition}) → ${videoUrl ? 'vidéo trouvée' : '⚠️ vidéo manquante'}`
+					);
 					return {
 						id: inst.id,
 						name: inst.name,
@@ -335,8 +357,22 @@ export const sequencerActions = {
 						maxDuration: inst.maxDuration || 0
 					};
 				});
+				console.log('✅ Instruments reconstruits:', instruments.length);
 
 				// Restaurer l'état complet
+				console.log('🎬 Restauration des clips:', jsonData.clips?.length || 0);
+				jsonData.clips?.forEach((clip: any, index: number) => {
+					console.log(
+						`   ${index + 1}. Clip sur instrument ${clip.instrumentId}, beat ${clip.startTime}, durée ${clip.duration}`
+					);
+				});
+
+				console.log('⚙️ Restauration des paramètres:');
+				console.log(`   - BPM: ${jsonData.bpm}`);
+				console.log(`   - Total beats: ${jsonData.totalBeats}`);
+				console.log(`   - Grid: ${jsonData.gridSize.rows}x${jsonData.gridSize.cols}`);
+				console.log(`   - Loop mode: ${jsonData.loopMode || false}`);
+
 				return {
 					instruments,
 					clips: jsonData.clips,
@@ -349,9 +385,13 @@ export const sequencerActions = {
 				};
 			});
 
+			console.log('✅ Import terminé avec succès');
 			return true;
 		} catch (err) {
-			console.error("Erreur lors de l'import:", err);
+			console.error("❌ Erreur lors de l'import:");
+			console.error('   Type:', err instanceof Error ? err.name : typeof err);
+			console.error('   Message:', err instanceof Error ? err.message : String(err));
+			console.error('   Stack:', err instanceof Error ? err.stack : 'N/A');
 			return false;
 		}
 	},
@@ -557,15 +597,26 @@ print(f"Fichier: {output_file}")
 			);
 
 			// Appeler l'API de rendu
+			// Timeout de 30 minutes pour les très longs rendus (nombreux clips)
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000);
+
+			console.log('🎬 Envoi de la requête de rendu...');
 			const response = await fetch('/api/render', {
 				method: 'POST',
-				body: formData
+				body: formData,
+				signal: controller.signal
 			});
+
+			clearTimeout(timeoutId);
 
 			if (!response.ok) {
 				const errorText = await response.text();
+				console.error('❌ Erreur HTTP:', response.status, errorText);
 				throw new Error(`Erreur HTTP ${response.status}: ${errorText}`);
 			}
+
+			console.log('✅ Réponse reçue, téléchargement du fichier...');
 
 			// Télécharger le fichier vidéo
 			const blob = await response.blob();

@@ -24,5 +24,5 @@ RUN mkdir -p /app/output /app/clips
 # Exposer le port
 EXPOSE 8000
 
-# Lancer l'API
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Lancer l'API avec timeout augmenté pour longs rendus
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "1800"]

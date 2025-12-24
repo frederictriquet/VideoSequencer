@@ -102,26 +102,39 @@
 
 		if (file && file.type === 'application/json') {
 			try {
+				console.log('📂 Lecture du fichier JSON:', file.name);
 				const text = await file.text();
-				const jsonData = JSON.parse(text);
+				console.log('📝 Contenu brut (premiers 200 chars):', text.substring(0, 200));
 
-				console.log('📤 Import JSON:', jsonData);
+				const jsonData = JSON.parse(text);
+				console.log('📤 JSON parsé avec succès');
+				console.log('   - BPM:', jsonData.bpm);
+				console.log('   - Total beats:', jsonData.totalBeats);
+				console.log('   - Grid size:', jsonData.gridSize);
+				console.log('   - Instruments:', jsonData.instruments?.length);
+				console.log('   - Clips:', jsonData.clips?.length);
+
 				const success = await sequencerActions.importFromJSON(jsonData);
 
 				if (success) {
-					console.log('✅ État après import:', $sequencerState);
+					console.log('✅ Import réussi - État après import:', $sequencerState);
 					alert(
 						`Projet chargé : ${jsonData.instruments.length} instruments, ${jsonData.clips.length} clips`
 					);
 				} else {
+					console.error('❌ importFromJSON a retourné false');
 					alert('Erreur lors du chargement du projet');
 				}
 			} catch (err) {
-				alert('Fichier JSON invalide');
-				console.error('Erreur parsing JSON:', err);
+				console.error("❌ Erreur lors de l'import JSON:");
+				console.error('   Type:', err instanceof Error ? err.name : typeof err);
+				console.error('   Message:', err instanceof Error ? err.message : String(err));
+				console.error('   Stack:', err instanceof Error ? err.stack : 'N/A');
+				alert(`Fichier JSON invalide: ${err instanceof Error ? err.message : String(err)}`);
 			}
 			target.value = '';
 		} else {
+			console.warn("⚠️ Fichier sélectionné n'est pas un JSON:", file?.type);
 			alert('Veuillez sélectionner un fichier JSON');
 		}
 	}
