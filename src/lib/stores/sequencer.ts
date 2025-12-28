@@ -56,6 +56,8 @@ export const sequencerActions = {
 			}
 
 			const gridPosition = freePositions[0];
+			// trackPosition = position actuelle dans la timeline (ordre d'ajout)
+			const trackPosition = state.instruments.length;
 
 			const colors = [
 				'#FF6B6B',
@@ -81,6 +83,7 @@ export const sequencerActions = {
 						videoUrl: url,
 						color,
 						gridPosition,
+						trackPosition,
 						offset: 0,
 						maxDuration: 0
 					}
@@ -97,10 +100,13 @@ export const sequencerActions = {
 				URL.revokeObjectURL(instrument.videoUrl);
 			}
 
+			// Supprimer tous les clips qui référencent cette gridPosition
+			const gridPosToRemove = instrument?.gridPosition;
+
 			return {
 				...state,
 				instruments: state.instruments.filter((inst) => inst.id !== id),
-				clips: state.clips.filter((clip) => clip.instrumentId !== id)
+				clips: state.clips.filter((clip) => clip.gridPosition !== gridPosToRemove)
 			};
 		});
 	},
@@ -108,13 +114,20 @@ export const sequencerActions = {
 	addClip: (instrumentId: string, startTime: number, duration: number, trackIndex: number) => {
 		sequencerState.update((state) => {
 			const id = `clip-${Date.now()}-${Math.random()}`;
+			// Trouver la gridPosition de l'instrument
+			const instrument = state.instruments.find((inst) => inst.id === instrumentId);
+			if (!instrument) {
+				console.warn(`Instrument ${instrumentId} not found`);
+				return state;
+			}
+
 			return {
 				...state,
 				clips: [
 					...state.clips,
 					{
 						id,
-						instrumentId,
+						gridPosition: instrument.gridPosition, // Stocker la gridPosition au lieu de l'instrumentId
 						startTime,
 						duration,
 						trackIndex
@@ -195,46 +208,94 @@ export const sequencerActions = {
 		}));
 	},
 
-	moveInstrumentToPosition: (instrumentId: string, newPosition: number) => {
+	moveInstrumentToPosition: (instrumentId: string, newGridPosition: number) => {
 		sequencerState.update((state) => {
 			// Vérifier que la position est valide
 			const maxPosition = state.gridSize.rows * state.gridSize.cols - 1;
-			if (newPosition < 0 || newPosition > maxPosition) {
+			if (newGridPosition < 0 || newGridPosition > maxPosition) {
 				return state;
 			}
 
-			// Trouver l'instrument à cette position
-			const occupyingInstrument = state.instruments.find(
-				(inst) => inst.gridPosition === newPosition
-			);
+			// Trouver l'instrument à déplacer et celui qui occupe la position de destination
 			const movingInstrument = state.instruments.find((inst) => inst.id === instrumentId);
+			const occupyingInstrument = state.instruments.find(
+				(inst) => inst.gridPosition === newGridPosition
+			);
 
 			if (!movingInstrument) return state;
 
-			// Si la position est occupée, échanger les positions
+			// Échanger à la fois gridPosition ET trackPosition
+			// Cela fait que la vidéo ET la track échangent de place ensemble
+			let updatedInstruments;
+			let updatedClips = state.clips;
+
 			if (occupyingInstrument) {
-				const oldPosition = movingInstrument.gridPosition;
-				return {
-					...state,
-					instruments: state.instruments.map((inst) => {
-						if (inst.id === instrumentId) {
-							return { ...inst, gridPosition: newPosition };
-						}
-						if (inst.id === occupyingInstrument.id) {
-							return { ...inst, gridPosition: oldPosition };
-						}
-						return inst;
-					})
-				};
+				// Swap des gridPosition ET des trackPosition
+				const oldGridPosition = movingInstrument.gridPosition;
+				const oldTrackPosition = movingInstrument.trackPosition;
+				const occupyingTrackPosition = occupyingInstrument.trackPosition;
+
+				updatedInstruments = state.instruments.map((inst) => {
+					if (inst.id === instrumentId) {
+						return {
+							...inst,
+							gridPosition: newGridPosition,
+							trackPosition: occupyingTrackPosition
+						};
+					}
+					if (inst.id === occupyingInstrument.id) {
+						return {
+							...inst,
+							gridPosition: oldGridPosition,
+							trackPosition: oldTrackPosition
+						};
+					}
+					return inst;
+				});
+
+				// Échanger les gridPosition des clips pour qu'ils suivent le swap des instruments
+				// Cela garantit que la timeline ET le replay restent cohérents
+				const oldGridPos = movingInstrument.gridPosition;
+				const newGridPos = occupyingInstrument.gridPosition;
+
+				updatedClips = state.clips.map((clip) => {
+					if (clip.gridPosition === oldGridPos) {
+						// Ce clip était sur l'ancienne position de l'instrument déplacé
+						return { ...clip, gridPosition: newGridPos };
+					} else if (clip.gridPosition === newGridPos) {
+						// Ce clip était sur la position de destination
+						return { ...clip, gridPosition: oldGridPos };
+					}
+					return clip;
+				});
+
+				// Recalculer les trackIndex de tous les clips selon le nouvel ordre
+				const sortedInstruments = [...updatedInstruments].sort(
+					(a, b) => a.trackPosition - b.trackPosition
+				);
+
+				// Créer un map: gridPosition -> trackIndex
+				const gridPosToTrackIndex = new Map<number, number>();
+				sortedInstruments.forEach((inst, index) => {
+					gridPosToTrackIndex.set(inst.gridPosition, index);
+				});
+
+				updatedClips = updatedClips.map((clip) => ({
+					...clip,
+					trackIndex: gridPosToTrackIndex.get(clip.gridPosition) ?? clip.trackIndex
+				}));
 			} else {
-				// Position libre, simplement déplacer
-				return {
-					...state,
-					instruments: state.instruments.map((inst) =>
-						inst.id === instrumentId ? { ...inst, gridPosition: newPosition } : inst
-					)
-				};
+				// Position libre, simplement déplacer gridPosition (trackPosition ne change pas)
+				updatedInstruments = state.instruments.map((inst) =>
+					inst.id === instrumentId ? { ...inst, gridPosition: newGridPosition } : inst
+				);
 			}
+
+			return {
+				...state,
+				instruments: updatedInstruments,
+				clips: updatedClips
+			};
 		});
 	},
 
@@ -274,12 +335,13 @@ export const sequencerActions = {
 				name: inst.name,
 				color: inst.color,
 				gridPosition: inst.gridPosition,
+				trackPosition: inst.trackPosition,
 				offset: inst.offset || 0,
 				maxDuration: inst.maxDuration || 0
 			})),
 			clips: state.clips.map((clip) => ({
 				id: clip.id,
-				instrumentId: clip.instrumentId,
+				gridPosition: clip.gridPosition,
 				startTime: clip.startTime,
 				duration: clip.duration,
 				trackIndex: clip.trackIndex
@@ -351,6 +413,7 @@ export const sequencerActions = {
 						name: inst.name,
 						color: inst.color,
 						gridPosition: inst.gridPosition,
+						trackPosition: inst.trackPosition ?? index, // Utiliser trackPosition du JSON ou index comme fallback
 						videoFile: null,
 						videoUrl,
 						offset: inst.offset || 0,
@@ -363,7 +426,7 @@ export const sequencerActions = {
 				console.log('🎬 Restauration des clips:', jsonData.clips?.length || 0);
 				jsonData.clips?.forEach((clip: any, index: number) => {
 					console.log(
-						`   ${index + 1}. Clip sur instrument ${clip.instrumentId}, beat ${clip.startTime}, durée ${clip.duration}`
+						`   ${index + 1}. Clip sur gridPosition ${clip.gridPosition}, beat ${clip.startTime}, durée ${clip.duration}`
 					);
 				});
 
@@ -389,6 +452,196 @@ export const sequencerActions = {
 			return true;
 		} catch (err) {
 			console.error("❌ Erreur lors de l'import:");
+			console.error('   Type:', err instanceof Error ? err.name : typeof err);
+			console.error('   Message:', err instanceof Error ? err.message : String(err));
+			console.error('   Stack:', err instanceof Error ? err.stack : 'N/A');
+			return false;
+		}
+	},
+
+	exportToCSV: (state: SequencerState) => {
+		// Trier les instruments par gridPosition pour correspondre à l'ordre de la grille
+		const sortedInstruments = [...state.instruments].sort(
+			(a, b) => a.gridPosition - b.gridPosition
+		);
+
+		// Trouver le dernier beat utilisé
+		const lastBeat = state.clips.reduce((max, clip) => {
+			return Math.max(max, clip.startTime);
+		}, 0);
+
+		// Générer les colonnes par demi-beats jusqu'au dernier beat + marge
+		const totalBeats = Math.ceil(lastBeat) + 4;
+		const columns: number[] = [];
+		for (let beat = 0; beat < totalBeats; beat += 0.5) {
+			columns.push(beat);
+		}
+
+		// Construire l'en-tête
+		let csv = 'Instrument,' + columns.join(',') + '\n';
+
+		// Construire chaque ligne d'instrument
+		sortedInstruments.forEach((instrument) => {
+			const row: string[] = [instrument.name];
+
+			// Pour chaque colonne, vérifier s'il y a un clip qui commence à ce beat
+			columns.forEach((beat) => {
+				const hasClip = state.clips.some(
+					(clip) => clip.gridPosition === instrument.gridPosition && clip.startTime === beat
+				);
+				row.push(hasClip ? 'X' : '');
+			});
+
+			csv += row.join(',') + '\n';
+		});
+
+		// Télécharger le fichier
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `VideoSequencer-${Date.now()}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	},
+
+	importFromCSV: async (csvContent: string) => {
+		try {
+			console.log('🔄 Début importFromCSV');
+
+			// Parser le CSV
+			const lines = csvContent.trim().split('\n');
+			if (lines.length < 2) {
+				throw new Error('Fichier CSV vide ou invalide');
+			}
+
+			// Parser l'en-tête pour obtenir les beats
+			const header = lines[0].split(',');
+			if (header[0] !== 'Instrument') {
+				throw new Error('Format CSV invalide: première colonne doit être "Instrument"');
+			}
+			const beats = header.slice(1).map((b) => parseFloat(b));
+			console.log('✅ Beats trouvés:', beats.length);
+
+			// Parser chaque ligne d'instrument
+			const instrumentLines = lines.slice(1);
+			console.log('✅ Instruments trouvés:', instrumentLines.length);
+
+			// Déterminer la taille de la grille (n×n)
+			const n = Math.ceil(Math.sqrt(instrumentLines.length));
+			console.log(`✅ Taille de grille calculée: ${n}×${n}`);
+
+			// Charger les vidéos disponibles
+			console.log('📂 Chargement des clips disponibles...');
+			const response = await fetch('/api/clips');
+			if (!response.ok) {
+				throw new Error(`Erreur chargement clips: ${response.status}`);
+			}
+			const clipsData = await response.json();
+			const availableVideos = new Map<string, string>();
+			clipsData.files?.forEach((filename: string) => {
+				const name = filename.replace(/\.[^/.]+$/, '');
+				availableVideos.set(name, `/api/clips/${filename}`);
+			});
+			console.log('✅ Clips disponibles:', availableVideos.size);
+
+			// Générer une palette de couleurs
+			const colors = [
+				'#667eea',
+				'#f093fb',
+				'#4facfe',
+				'#43e97b',
+				'#fa709a',
+				'#fee140',
+				'#30cfd0',
+				'#a8edea',
+				'#ff6b6b',
+				'#4ecdc4',
+				'#45b7d1',
+				'#f7b731',
+				'#5f27cd',
+				'#00d2d3',
+				'#ff9ff3',
+				'#feca57'
+			];
+
+			// Construire les instruments et clips
+			const instruments: VideoInstrument[] = [];
+			const clips: VideoClip[] = [];
+
+			instrumentLines.forEach((line, instrumentIndex) => {
+				const cells = line.split(',');
+				const instrumentName = cells[0].trim();
+				const clipMarkers = cells.slice(1);
+
+				// Créer l'instrument
+				const instrumentId = `instrument-${Date.now()}-${Math.random()}`;
+				const videoUrl = availableVideos.get(instrumentName) || null;
+				const color = colors[instrumentIndex % colors.length];
+
+				instruments.push({
+					id: instrumentId,
+					name: instrumentName,
+					color,
+					gridPosition: instrumentIndex,
+					trackPosition: instrumentIndex, // Dans CSV, trackPosition = gridPosition initialement
+					videoFile: null,
+					videoUrl,
+					offset: 0,
+					maxDuration: 0
+				});
+
+				console.log(
+					`   ${instrumentIndex + 1}. ${instrumentName} (position ${instrumentIndex}) → ${videoUrl ? 'vidéo trouvée' : '⚠️ vidéo manquante'}`
+				);
+
+				// Créer les clips pour cet instrument
+				clipMarkers.forEach((marker, beatIndex) => {
+					if (marker.trim().toUpperCase() === 'X') {
+						const clipId = `clip-${Date.now()}-${Math.random()}`;
+						clips.push({
+							id: clipId,
+							gridPosition: instrumentIndex, // Utiliser gridPosition au lieu d'instrumentId
+							startTime: beats[beatIndex],
+							duration: 0.5, // Durée par défaut (non utilisée pour le rendu)
+							trackIndex: instrumentIndex
+						});
+					}
+				});
+			});
+
+			console.log('✅ Instruments créés:', instruments.length);
+			console.log('✅ Clips créés:', clips.length);
+
+			// Calculer le totalBeats
+			const lastBeat = clips.reduce((max, clip) => Math.max(max, clip.startTime), 0);
+			const totalBeats = Math.ceil(lastBeat) + 4;
+
+			// Mettre à jour l'état
+			sequencerState.update((state) => {
+				// Nettoyer les anciennes URLs
+				state.instruments.forEach((inst) => {
+					if (inst.videoUrl) {
+						URL.revokeObjectURL(inst.videoUrl);
+					}
+				});
+
+				return {
+					instruments,
+					clips,
+					isPlaying: false,
+					currentTime: 0,
+					bpm: 120, // BPM par défaut
+					totalBeats,
+					gridSize: { rows: n, cols: n },
+					loopMode: false
+				};
+			});
+
+			console.log('✅ Import CSV terminé avec succès');
+			return true;
+		} catch (err) {
+			console.error("❌ Erreur lors de l'import CSV:");
 			console.error('   Type:', err instanceof Error ? err.name : typeof err);
 			console.error('   Message:', err instanceof Error ? err.message : String(err));
 			console.error('   Stack:', err instanceof Error ? err.stack : 'N/A');
@@ -447,7 +700,7 @@ clips = []
 
 		// Générer le code pour chaque clip
 		state.clips.forEach((clip, idx) => {
-			const inst = state.instruments.find((i) => i.id === clip.instrumentId);
+			const inst = state.instruments.find((i) => i.gridPosition === clip.gridPosition);
 			if (!inst) return;
 
 			const startSec = timeUtils.beatsToSeconds(clip.startTime, state.bpm);
@@ -569,7 +822,7 @@ print(f"Fichier: {output_file}")
 				})),
 				clips: state.clips.map((clip) => ({
 					id: clip.id,
-					instrumentId: clip.instrumentId,
+					gridPosition: clip.gridPosition,
 					startTime: clip.startTime,
 					duration: clip.duration
 				}))

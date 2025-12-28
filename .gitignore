@@ -54,6 +54,7 @@ ENV/
 /clips/*.mov
 render-videoSeq.py
 render-videoSeq.sh
+/clips2/
 
 # Python virtual environments
 render-service/.venv/

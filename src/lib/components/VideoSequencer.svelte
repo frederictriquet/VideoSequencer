@@ -9,6 +9,7 @@
 
 	let fileInput: HTMLInputElement;
 	let jsonFileInput: HTMLInputElement;
+	let csvFileInput: HTMLInputElement;
 	let instrumentName = '';
 	let showVideoGrid = true;
 	let showTimeline = true;
@@ -60,6 +61,49 @@
 
 	function exportProject() {
 		sequencerActions.exportToJSON($sequencerState);
+	}
+
+	function exportProjectCSV() {
+		sequencerActions.exportToCSV($sequencerState);
+	}
+
+	function triggerCsvFileInput() {
+		csvFileInput?.click();
+	}
+
+	async function handleCsvFileSelect(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+
+		if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) {
+			try {
+				console.log('📂 Lecture du fichier CSV:', file.name);
+				const text = await file.text();
+				console.log('📝 Contenu brut (premiers 200 chars):', text.substring(0, 200));
+
+				const success = await sequencerActions.importFromCSV(text);
+
+				if (success) {
+					console.log('✅ Import CSV réussi - État après import:', $sequencerState);
+					alert(
+						`Projet CSV chargé : ${$sequencerState.instruments.length} instruments, ${$sequencerState.clips.length} clips`
+					);
+				} else {
+					console.error('❌ importFromCSV a retourné false');
+					alert('Erreur lors du chargement du projet CSV');
+				}
+			} catch (err) {
+				console.error("❌ Erreur lors de l'import CSV:");
+				console.error('   Type:', err instanceof Error ? err.name : typeof err);
+				console.error('   Message:', err instanceof Error ? err.message : String(err));
+				console.error('   Stack:', err instanceof Error ? err.stack : 'N/A');
+				alert(`Fichier CSV invalide: ${err instanceof Error ? err.message : String(err)}`);
+			}
+			target.value = '';
+		} else {
+			console.warn("⚠️ Fichier sélectionné n'est pas un CSV:", file?.type);
+			alert('Veuillez sélectionner un fichier CSV');
+		}
 	}
 
 	async function renderVideo() {
@@ -174,6 +218,12 @@
 			<button onclick={exportProject} class="export-btn" title="Exporter le projet">
 				📥 Export JSON
 			</button>
+			<button onclick={triggerCsvFileInput} class="import-csv-btn" title="Importer un projet CSV">
+				📤 Import CSV
+			</button>
+			<button onclick={exportProjectCSV} class="export-csv-btn" title="Exporter le projet en CSV">
+				📥 Export CSV
+			</button>
 			<button onclick={renderVideo} class="render-btn" title="Générer le rendu vidéo">
 				🎬 Rendu Vidéo
 			</button>
@@ -203,6 +253,13 @@
 				accept="application/json,.json"
 				bind:this={jsonFileInput}
 				onchange={handleJsonFileSelect}
+				style="display: none;"
+			/>
+			<input
+				type="file"
+				accept=".csv,text/csv"
+				bind:this={csvFileInput}
+				onchange={handleCsvFileSelect}
 				style="display: none;"
 			/>
 		</div>
@@ -388,6 +445,52 @@
 	}
 
 	.import-btn:active {
+		transform: translateY(0);
+	}
+
+	.import-csv-btn {
+		padding: 0.5rem 1.5rem;
+		background: #2a2a2a;
+		border: 1px solid #444;
+		border-radius: 4px;
+		color: white;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 0.9rem;
+	}
+
+	.import-csv-btn:hover {
+		background: #333;
+		border-color: #43e97b;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(67, 233, 123, 0.3);
+	}
+
+	.import-csv-btn:active {
+		transform: translateY(0);
+	}
+
+	.export-csv-btn {
+		padding: 0.5rem 1.5rem;
+		background: #2a2a2a;
+		border: 1px solid #444;
+		border-radius: 4px;
+		color: white;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 0.9rem;
+	}
+
+	.export-csv-btn:hover {
+		background: #333;
+		border-color: #43e97b;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(67, 233, 123, 0.3);
+	}
+
+	.export-csv-btn:active {
 		transform: translateY(0);
 	}
 

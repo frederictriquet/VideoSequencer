@@ -8,8 +8,8 @@
 	} from '$lib/stores/sequencer';
 	import type { VideoInstrument } from '$lib/types/sequencer';
 
-	// Références aux éléments vidéo
-	let videoRefs: Map<string, HTMLVideoElement> = new Map();
+	// Références aux éléments vidéo (par gridPosition)
+	let videoRefs: Map<number, HTMLVideoElement> = new Map();
 	let gridContainer: HTMLDivElement;
 
 	// Variables pour le drag & drop
@@ -49,17 +49,17 @@
 		dragOverPosition = null;
 	}
 
-	// Action Svelte pour enregistrer une référence vidéo
-	function videoAction(element: HTMLVideoElement, id: string) {
-		videoRefs.set(id, element);
+	// Action Svelte pour enregistrer une référence vidéo (par gridPosition)
+	function videoAction(element: HTMLVideoElement, gridPos: number) {
+		videoRefs.set(gridPos, element);
 		element.preload = 'auto';
 		element.loop = false;
-		console.log(`📹 Video registered: ${id}, src: ${element.src}`);
+		console.log(`📹 Video registered at gridPos ${gridPos}, src: ${element.src}`);
 
 		return {
 			destroy() {
-				videoRefs.delete(id);
-				console.log(`🗑️ Video unregistered: ${id}`);
+				videoRefs.delete(gridPos);
+				console.log(`🗑️ Video unregistered at gridPos ${gridPos}`);
 			}
 		};
 	}
@@ -82,7 +82,7 @@
 			'🎬 Current clips:',
 			$sequencerState.clips.map((c) => ({
 				id: c.id,
-				instrumentId: c.instrumentId,
+				gridPosition: c.gridPosition,
 				start: c.startTime,
 				duration: c.duration
 			}))
@@ -92,8 +92,8 @@
 	// Mapper les clips actifs avec leur progression
 	let activeClipsMap = new Map<string, { clip: any; progress: number }>();
 
-	// Stocker l'ID du clip actif et son temps de début pour chaque instrument
-	let activeClipInfo = new Map<string, { clipId: string; startTime: number }>();
+	// Stocker l'ID du clip actif et son temps de début pour chaque gridPosition
+	let activeClipInfo = new Map<number, { clipId: string; startTime: number }>();
 
 	// Réinitialiser quand on arrête de jouer
 	$: if (!$sequencerState.isPlaying) {
@@ -106,8 +106,8 @@
 
 		// Si on ne joue pas, arrêter toutes les vidéos et afficher la frame à l'offset
 		if (!$sequencerState.isPlaying) {
-			videoRefs.forEach((video, instrumentId) => {
-				const instrument = $sequencerState.instruments.find((i) => i.id === instrumentId);
+			videoRefs.forEach((video, gridPos) => {
+				const instrument = $sequencerState.instruments.find((i) => i.gridPosition === gridPos);
 				const offset = instrument?.offset || 0;
 
 				if (!video.paused) {
@@ -120,12 +120,12 @@
 						video.currentTime = offset;
 					}
 				} catch (err) {
-					console.warn(`⚠️ Erreur définition currentTime pour ${instrumentId}: ${err}`);
+					console.warn(`⚠️ Erreur définition currentTime pour gridPos ${gridPos}: ${err}`);
 				}
 			});
 		} else {
-			// Créer un set des instruments qui ont des clips actifs
-			const currentActiveInstruments = new Set<string>();
+			// Créer un set des gridPositions qui ont des clips actifs
+			const currentActiveGridPositions = new Set<number>();
 
 			// Mode lecture : gérer les clips actifs
 			$sequencerState.clips.forEach((clip) => {
@@ -135,33 +135,35 @@
 					$sequencerState.currentTime >= clipStart && $sequencerState.currentTime < clipEnd;
 
 				if (isActive) {
-					currentActiveInstruments.add(clip.instrumentId);
-					const video = videoRefs.get(clip.instrumentId);
+					currentActiveGridPositions.add(clip.gridPosition);
+					const video = videoRefs.get(clip.gridPosition);
 					if (!video) {
-						console.warn(`⚠️ No video ref found for instrument ${clip.instrumentId}`);
+						console.warn(`⚠️ No video ref found for gridPosition ${clip.gridPosition}`);
 						return;
 					}
 
 					// Vérifier si c'est un nouveau clip (différent ID)
-					const currentInfo = activeClipInfo.get(clip.instrumentId);
+					const currentInfo = activeClipInfo.get(clip.gridPosition);
 					const isNewClip = !currentInfo || currentInfo.clipId !== clip.id;
 
 					if (isNewClip) {
 						// Nouveau clip : enregistrer ses infos et calculer le playbackRate
-						console.log(`🎬 Starting new clip ${clip.id} for instrument ${clip.instrumentId}`);
-						activeClipInfo.set(clip.instrumentId, {
+						console.log(`🎬 Starting new clip ${clip.id} for gridPosition ${clip.gridPosition}`);
+						activeClipInfo.set(clip.gridPosition, {
 							clipId: clip.id,
 							startTime: clipStart
 						});
 
 						// Assurer que la vidéo est chargée et a des métadonnées
 						if (video.readyState < 2) {
-							console.log(`⏳ Loading video for ${clip.instrumentId}`);
+							console.log(`⏳ Loading video for gridPosition ${clip.gridPosition}`);
 							video.load();
 						}
 
-						// Trouver l'instrument pour obtenir son offset et maxDuration
-						const instrument = $sequencerState.instruments.find((i) => i.id === clip.instrumentId);
+						// Trouver l'instrument à cette gridPosition pour obtenir son offset et maxDuration
+						const instrument = $sequencerState.instruments.find(
+							(i) => i.gridPosition === clip.gridPosition
+						);
 						const offset = instrument?.offset || 0;
 						const maxDuration = instrument?.maxDuration || 0;
 
@@ -194,13 +196,15 @@
 						if (playPromise !== undefined) {
 							playPromise.catch((err) => {
 								if (err.name !== 'AbortError') {
-									console.warn(`Erreur lecture vidéo ${clip.instrumentId}:`, err.message);
+									console.warn(`Erreur lecture vidéo gridPos ${clip.gridPosition}:`, err.message);
 								}
 							});
 						}
 					} else {
 						// La vidéo joue déjà pour ce clip, vérifier si elle a atteint sa fin (maxDuration)
-						const instrument = $sequencerState.instruments.find((i) => i.id === clip.instrumentId);
+						const instrument = $sequencerState.instruments.find(
+							(i) => i.gridPosition === clip.gridPosition
+						);
 						const offset = instrument?.offset || 0;
 						const maxDuration = instrument?.maxDuration || 0;
 
@@ -214,9 +218,9 @@
 			});
 
 			// Arrêter les vidéos qui n'ont plus de clips actifs et qui ont dépassé leur maxDuration
-			videoRefs.forEach((video, instrumentId) => {
-				if (!currentActiveInstruments.has(instrumentId) && !video.paused) {
-					const instrument = $sequencerState.instruments.find((i) => i.id === instrumentId);
+			videoRefs.forEach((video, gridPos) => {
+				if (!currentActiveGridPositions.has(gridPos) && !video.paused) {
+					const instrument = $sequencerState.instruments.find((i) => i.gridPosition === gridPos);
 					const offset = instrument?.offset || 0;
 					const maxDuration = instrument?.maxDuration || 0;
 
@@ -226,7 +230,7 @@
 					if (!shouldContinue) {
 						video.pause();
 						video.currentTime = offset;
-						activeClipInfo.delete(instrumentId);
+						activeClipInfo.delete(gridPos);
 					}
 					// Sinon, laisser la vidéo continuer de jouer même sans clip actif
 				}
@@ -265,7 +269,7 @@
 					ondragend={handleDragEnd}
 				>
 					<video
-						use:videoAction={instrument.id}
+						use:videoAction={instrument.gridPosition}
 						src={instrument.videoUrl}
 						class="video-player"
 						muted={false}

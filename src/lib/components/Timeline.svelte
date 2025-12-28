@@ -29,13 +29,13 @@
 	// Position du curseur pour la ligne de guide
 	let cursorBeat = -1;
 
-	// Trier les instruments par gridPosition pour que les tracks correspondent à la grille
+	// Trier les instruments par trackPosition pour l'ordre dans la timeline
 	$: tracks = [...$sequencerState.instruments]
-		.sort((a, b) => a.gridPosition - b.gridPosition)
+		.sort((a, b) => a.trackPosition - b.trackPosition)
 		.map((inst, index) => ({
 			index,
 			instrument: inst,
-			clips: $sequencerState.clips.filter((clip) => clip.instrumentId === inst.id)
+			clips: $sequencerState.clips.filter((clip) => clip.gridPosition === inst.gridPosition)
 		}));
 
 	$: timelineWidth = $sequencerState.totalBeats * PIXELS_PER_BEAT;
@@ -134,7 +134,7 @@
 	function handleTimelineClick(event: MouseEvent) {
 		if (!timelineCanvas) return;
 		const rect = timelineCanvas.getBoundingClientRect();
-		const x = event.clientX - rect.left + tracksContainer.scrollLeft;
+		const x = event.clientX - rect.left;
 		let beat = x / PIXELS_PER_BEAT;
 
 		// Aligner sur le début du demi-beat (comme la ligne de guide)
@@ -185,7 +185,7 @@
 			if (currentClip) {
 				const newClipEnd = newStartTime + currentClip.duration;
 				const hasOverlap = $sequencerState.clips.some((clip) => {
-					if (clip.id === draggedClipId || clip.instrumentId !== currentClip.instrumentId)
+					if (clip.id === draggedClipId || clip.gridPosition !== currentClip.gridPosition)
 						return false;
 
 					const clipEnd = clip.startTime + clip.duration;
@@ -216,8 +216,12 @@
 			const duration = Math.max(0.5, endBeat - newClipStart);
 
 			// Vérifier qu'il n'y a pas de chevauchement avec un clip existant
+			// Trouver la gridPosition de l'instrument
+			const instrument = $sequencerState.instruments.find((i) => i.id === newClipInstrumentId);
+			if (!instrument) return;
+
 			const hasOverlap = $sequencerState.clips.some((clip) => {
-				if (clip.instrumentId !== newClipInstrumentId) return false;
+				if (clip.gridPosition !== instrument.gridPosition) return false;
 
 				const clipEnd = clip.startTime + clip.duration;
 				const newClipEnd = newClipStart + duration;
