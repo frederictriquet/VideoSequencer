@@ -4,7 +4,7 @@ API de rendu vidéo pour VideoSequencer
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from moviepy import VideoFileClip, ColorClip, CompositeVideoClip
@@ -12,10 +12,36 @@ import os
 import tempfile
 import json
 import subprocess
+import asyncio
+import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import multiprocessing
 
 app = FastAPI(title="VideoSequencer Render Service")
+
+# Executor pour les tâches de rendu en arrière-plan
+render_executor = ThreadPoolExecutor(max_workers=2)
+
+# Stockage des jobs de rendu en cours
+@dataclass
+class RenderJob:
+    id: str
+    status: str = "pending"  # pending, processing, completed, error
+    progress: int = 0  # 0-100
+    step: str = ""
+    output_path: str = ""
+    error: str = ""
+    total_clips: int = 0
+    processed_clips: int = 0
+    # Données nécessaires pour le rendu (stockées après upload)
+    request_data: Optional[Dict] = None
+    uploaded_videos: Optional[Dict[str, str]] = None
+
+render_jobs: Dict[str, RenderJob] = {}
 
 # CORS pour permettre les requêtes depuis l'app web
 app.add_middleware(
@@ -112,34 +138,23 @@ def precise_cut_video(input_path: str, start_time: float, duration: float, outpu
 def root():
     return {"status": "ok", "service": "VideoSequencer Render API"}
 
-@app.post("/render")
-async def render_video(
-    data: str = Form(...),
-    videos: Optional[List[UploadFile]] = File(None)
-):
+def do_render_job(job_id: str, request_dict: dict, uploaded_videos: dict):
     """
-    Génère une vidéo à partir de la composition
-    Accepte aussi des vidéos uploadées en plus de celles dans ./clips/
+    Effectue le rendu vidéo dans un thread séparé.
+    Met à jour le job avec la progression.
     """
+    job = render_jobs.get(job_id)
+    if not job:
+        return
+
     try:
-        # Parser les données JSON
-        request = RenderRequest(**json.loads(data))
+        # Reconstruire la requête depuis le dict
+        request = RenderRequest(**request_dict)
 
-        # Sauvegarder les vidéos uploadées temporairement
-        uploaded_videos = {}
-        if videos:
-            print(f"📤 Réception de {len(videos)} vidéos uploadées...")
-            for video_file in videos:
-                # Le nom du fichier doit correspondre au nom de l'instrument
-                temp_path = os.path.join(TEMP_DIR, video_file.filename)
-                with open(temp_path, 'wb') as f:
-                    content = await video_file.read()
-                    f.write(content)
+        # Le reste du rendu commence ici
+        job.step = "Calcul de la durée..."
+        job.progress = 10
 
-                # Extraire le nom sans extension
-                name = os.path.splitext(video_file.filename)[0]
-                uploaded_videos[name] = temp_path
-                print(f"  ✓ Sauvegardé: {name} -> {temp_path}")
         # Calculer la durée totale
         last_clip_end = max(
             (clip.startTime + clip.duration for clip in request.clips),
@@ -148,7 +163,10 @@ async def render_video(
         total_duration = beats_to_seconds(last_clip_end, request.bpm)
 
         if total_duration == 0:
-            raise HTTPException(status_code=400, detail="Aucun clip à rendre")
+            job.status = "error"
+            job.error = "Aucun clip à rendre"
+            job.step = "Erreur!"
+            return
 
         # Configuration de la grille
         grid_cols = request.gridSize.cols
@@ -157,11 +175,15 @@ async def render_video(
         cell_height = 1080 // grid_rows
 
         print(f"🎬 Rendu VideoSequencer - Durée: {total_duration:.2f}s, Grille: {grid_cols}x{grid_rows}")
+        job.step = "Création du fond..."
+        job.progress = 15
 
         # Fond noir
         base = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=total_duration)
 
         # Créer les frames statiques pour chaque instrument
+        job.step = "Création des images fixes..."
+        job.progress = 20
         print("Création des images fixes...")
         static_frames = []
 
@@ -201,133 +223,164 @@ async def render_video(
             video.close()
 
         # Créer les clips animés
+        job.step = f"Préparation de {len(request.clips)} clips..."
+        job.progress = 25
         print(f"Création de {len(request.clips)} clips animés...")
         animated_clips = []
 
         # Cache pour éviter de découper et charger plusieurs fois le même clip
-        # Clé: (instrument_name, offset, duration) -> chemin du fichier découpé
         cut_clips_cache = {}
-        # Cache des clips MoviePy chargés (pour éviter de charger 332 fois le même fichier)
-        # Clé: chemin du fichier -> VideoFileClip (non redimensionné, non positionné)
         loaded_clips_cache = {}
 
+        # ====== PHASE 1: Collecter les infos de tous les clips ======
+        clips_info = []  # Liste de (clip, inst, video_path, offset, clip_duration, cache_key, position)
+
         for clip in request.clips:
-            # Trouver l'instrument correspondant
             inst = next((i for i in request.instruments if i.id == clip.instrumentId), None)
             if not inst:
                 continue
 
-            # Chercher d'abord dans les uploads, puis dans ./clips/
             video_path = uploaded_videos.get(inst.name)
-
             if not video_path:
-                # Chercher avec différentes extensions
-                print(f"     🔍 Recherche vidéo pour: '{inst.name}'")
                 for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
                     potential_path = os.path.join(CLIPS_DIR, f"{inst.name}{ext}")
-                    print(f"        Essai: {potential_path}")
                     if os.path.exists(potential_path):
                         video_path = potential_path
-                        print(f"        ✅ Trouvé!")
                         break
-                    else:
-                        print(f"        ❌ N'existe pas")
 
             if not video_path or not os.path.exists(video_path):
-                print(f"⚠️  Vidéo non trouvée pour instrument: {inst.name}")
-                print(f"     Fichiers disponibles dans {CLIPS_DIR}:")
-                try:
-                    files = os.listdir(CLIPS_DIR)
-                    for f in sorted(files):
-                        print(f"       - {f}")
-                except Exception as e:
-                    print(f"     Erreur listage: {e}")
                 continue
 
-            start_sec = beats_to_seconds(clip.startTime, request.bpm)
+            # Calculer les paramètres du clip
+            video = VideoFileClip(video_path)
             offset = inst.offset
             max_duration = inst.maxDuration
+            available_duration = video.duration - offset
+            video.close()
 
+            if max_duration > 0:
+                clip_duration = min(max_duration, available_duration)
+            else:
+                clip_duration = available_duration
+
+            start_sec = beats_to_seconds(clip.startTime, request.bpm)
             row = inst.gridPosition // grid_cols
             col = inst.gridPosition % grid_cols
             x = col * cell_width
             y = row * cell_height
 
-            # Créer le clip avec offset et maxDuration (indépendant de la durée en beats)
-            video = VideoFileClip(video_path)
-            available_duration = video.duration - offset
-
-            # Utiliser la portion définie par offset et maxDuration
-            if max_duration > 0:
-                # Limiter par maxDuration
-                clip_duration = min(max_duration, available_duration)
-            else:
-                # Utiliser toute la vidéo disponible après l'offset
-                clip_duration = available_duration
-
-            # Debug logging pour diagnostic
-            print(f"  📊 Clip {clip.id} (instrument: {inst.name}):")
-            print(f"     - startTime (beats): {clip.startTime}")
-            print(f"     - start_sec (calculé): {start_sec:.3f}s")
-            print(f"     - offset: {offset:.3f}s")
-            print(f"     - max_duration: {max_duration:.3f}s")
-            print(f"     - video.duration: {video.duration:.3f}s")
-            print(f"     - available_duration: {available_duration:.3f}s")
-            print(f"     - clip_duration (final): {clip_duration:.3f}s")
-            print(f"     - position grid: ({row}, {col}) → coords: ({x}, {y})")
-
-            # Vérifier si on a déjà découpé ce même clip (même instrument + offset + durée)
             cache_key = (inst.name, offset, clip_duration)
+            temp_cut_path = os.path.join(TEMP_DIR, f"cut_{inst.name}_{offset}_{clip_duration}.mp4")
+
+            clips_info.append({
+                'clip': clip,
+                'inst': inst,
+                'video_path': video_path,
+                'offset': offset,
+                'clip_duration': clip_duration,
+                'cache_key': cache_key,
+                'temp_cut_path': temp_cut_path,
+                'start_sec': start_sec,
+                'position': (x, y)
+            })
+
+        # ====== PHASE 2: Découper en parallèle avec FFmpeg ======
+        # Identifier les découpes uniques nécessaires
+        unique_cuts = {}  # cache_key -> temp_cut_path
+        for info in clips_info:
+            if info['cache_key'] not in unique_cuts:
+                unique_cuts[info['cache_key']] = info
+
+        num_cuts = len(unique_cuts)
+        job.step = f"Découpage de {num_cuts} clips uniques (parallèle)..."
+        print(f"🔪 Découpage parallèle de {num_cuts} clips uniques sur {min(num_cuts, multiprocessing.cpu_count())} threads...")
+
+        # Lancer les découpes en parallèle
+        num_workers = min(num_cuts, multiprocessing.cpu_count(), 8)  # Max 8 threads FFmpeg simultanés
+        cuts_completed = 0
+        cuts_failed = set()
+
+        if num_cuts > 0:
+            with ThreadPoolExecutor(max_workers=num_workers) as cut_executor:
+                # Soumettre toutes les tâches de découpe
+                future_to_key = {}
+                for cache_key, info in unique_cuts.items():
+                    # Vérifier si le fichier existe déjà (cache disque)
+                    if os.path.exists(info['temp_cut_path']):
+                        cut_clips_cache[cache_key] = info['temp_cut_path']
+                        cuts_completed += 1
+                        print(f"  ♻️ Cache disque: {info['inst'].name}")
+                    else:
+                        future = cut_executor.submit(
+                            precise_cut_video,
+                            info['video_path'],
+                            info['offset'],
+                            info['clip_duration'],
+                            info['temp_cut_path']
+                        )
+                        future_to_key[future] = (cache_key, info)
+
+                # Récupérer les résultats au fur et à mesure
+                for future in as_completed(future_to_key):
+                    cache_key, info = future_to_key[future]
+                    try:
+                        success = future.result()
+                        if success:
+                            cut_clips_cache[cache_key] = info['temp_cut_path']
+                            print(f"  ✅ Découpé: {info['inst'].name}")
+                        else:
+                            cuts_failed.add(cache_key)
+                            print(f"  ❌ Échec: {info['inst'].name}")
+                    except Exception as e:
+                        cuts_failed.add(cache_key)
+                        print(f"  ❌ Erreur {info['inst'].name}: {e}")
+
+                    cuts_completed += 1
+                    # Progression: 25% à 50% pour les découpes
+                    cut_progress = int(25 + (25 * cuts_completed / num_cuts))
+                    job.progress = min(cut_progress, 50)
+                    job.step = f"Découpage {cuts_completed}/{num_cuts}..."
+
+        print(f"✅ Découpes terminées: {len(cut_clips_cache)} réussies, {len(cuts_failed)} échouées")
+
+        # ====== PHASE 3: Charger et positionner les clips MoviePy ======
+        job.step = "Chargement des clips..."
+        job.progress = 55
+
+        for idx, info in enumerate(clips_info):
+            cache_key = info['cache_key']
+
+            # Ignorer si la découpe a échoué
+            if cache_key in cuts_failed:
+                continue
+
             temp_cut_path = cut_clips_cache.get(cache_key)
+            if not temp_cut_path:
+                continue
 
-            if temp_cut_path:
-                print(f"     - ♻️ Réutilisation du clip en cache")
-            else:
-                # Découper la vidéo avec ffmpeg pour précision frame-parfaite
-                print(f"     - Découpage précis avec ffmpeg: de {offset:.3f}s, durée {clip_duration:.3f}s")
-
-                # Créer un fichier temporaire pour le clip découpé
-                # Utiliser un nom basé sur le cache_key pour éviter les collisions
-                temp_cut_path = os.path.join(TEMP_DIR, f"cut_{inst.name}_{offset}_{clip_duration}.mp4")
-
-                # Découper avec ffmpeg (précision frame-parfaite)
-                success = precise_cut_video(video_path, offset, clip_duration, temp_cut_path)
-
-                if not success:
-                    print(f"⚠️  Échec découpage ffmpeg pour clip {clip.id}")
-                    continue
-
-                # Mettre en cache
-                cut_clips_cache[cache_key] = temp_cut_path
-                print(f"     - ✅ Clip découpé et mis en cache")
-
-            # Charger le clip pré-découpé dans MoviePy (avec cache)
+            # Charger ou réutiliser le clip MoviePy
             if temp_cut_path in loaded_clips_cache:
                 base_clip = loaded_clips_cache[temp_cut_path]
-                print(f"     - ♻️ Clip MoviePy en cache")
             else:
                 base_clip = VideoFileClip(temp_cut_path)
                 loaded_clips_cache[temp_cut_path] = base_clip
-                print(f"     - Clip chargé dans MoviePy, durée: {base_clip.duration:.3f}s")
 
-            # Créer une instance positionnée et redimensionnée pour ce clip spécifique
-            # Utiliser copy() pour créer une instance indépendante
+            # Créer l'instance positionnée
             video_cut = base_clip.copy()
             video_cut = video_cut.resized((cell_width, cell_height))
-            video_cut = video_cut.with_start(start_sec)
-            video_cut = video_cut.with_position((x, y))
-
-            print(f"     - Clip ajouté à la position {start_sec:.3f}s dans la composition")
+            video_cut = video_cut.with_start(info['start_sec'])
+            video_cut = video_cut.with_position(info['position'])
             animated_clips.append(video_cut)
 
-        # Statistiques du cache
-        print(f"\n📊 Statistiques du cache:")
-        print(f"   - Clips traités: {len(request.clips)}")
-        print(f"   - Clips uniques découpés: {len(cut_clips_cache)}")
-        print(f"   - Réutilisations: {len(request.clips) - len(cut_clips_cache)}")
-        print(f"   - Gain: {((len(request.clips) - len(cut_clips_cache)) / len(request.clips) * 100):.1f}%\n")
+            # Mise à jour progression (55% à 70% pour le chargement MoviePy)
+            job.processed_clips = len(animated_clips)
+            load_progress = int(55 + (15 * (idx + 1) / len(clips_info)))
+            job.progress = min(load_progress, 70)
+            job.step = f"Chargement clip {idx + 1}/{len(clips_info)}..."
 
         # Composer
+        job.step = "Composition finale..."
+        job.progress = 75
         print("Composition finale...")
         final = CompositeVideoClip(
             [base] + static_frames + animated_clips,
@@ -339,10 +392,9 @@ async def render_video(
         output_path = os.path.join(OUTPUT_DIR, output_filename)
 
         # Rendu
+        job.step = "Encodage vidéo (ffmpeg)..."
+        job.progress = 80
         print(f"Rendu vers: {output_path}")
-        # Utiliser des paramètres ffmpeg pour forcer la précision du découpage
-        # -avoid_negative_ts make_zero: évite les timestamps négatifs
-        # -copyts: préserve les timestamps originaux
         final.write_videofile(
             output_path,
             fps=30,
@@ -351,8 +403,9 @@ async def render_video(
             bitrate='5000k',
             preset='medium',
             ffmpeg_params=['-avoid_negative_ts', 'make_zero'],
-            logger=None  # Désactiver les logs verbeux
+            logger=None
         )
+        job.progress = 95
 
         # Nettoyer
         final.close()
@@ -364,17 +417,154 @@ async def render_video(
 
         print(f"✅ Rendu terminé: {output_filename}")
 
-        # Retourner le fichier
-        return FileResponse(
-            output_path,
-            media_type="video/mp4",
-            filename=output_filename
-        )
+        # Marquer le job comme terminé
+        job.status = "completed"
+        job.progress = 100
+        job.step = "Terminé!"
+        job.output_path = output_path
 
     except Exception as e:
         print(f"❌ Erreur de rendu: {str(e)}")
+        job.status = "error"
+        job.error = str(e)
+        job.step = "Erreur!"
+
+
+@app.post("/render")
+async def render_video(
+    data: str = Form(...),
+    videos: Optional[List[UploadFile]] = File(None)
+):
+    """
+    Génère une vidéo à partir de la composition.
+    Lance le rendu en arrière-plan et retourne immédiatement un job_id.
+    """
+    try:
+        # Parser les données JSON
+        request_dict = json.loads(data)
+        request = RenderRequest(**request_dict)
+
+        # Créer un job de rendu
+        job_id = str(uuid.uuid4())[:8]
+        job = RenderJob(
+            id=job_id,
+            status="processing",
+            step="Réception des fichiers...",
+            total_clips=len(request.clips)
+        )
+        render_jobs[job_id] = job
+        print(f"🆔 Job créé: {job_id}")
+
+        # Sauvegarder les vidéos uploadées temporairement (synchrone car await)
+        uploaded_videos = {}
+        if videos:
+            print(f"📤 Réception de {len(videos)} vidéos uploadées...")
+            for video_file in videos:
+                temp_path = os.path.join(TEMP_DIR, video_file.filename)
+                with open(temp_path, 'wb') as f:
+                    content = await video_file.read()
+                    f.write(content)
+                name = os.path.splitext(video_file.filename)[0]
+                uploaded_videos[name] = temp_path
+                print(f"  ✓ Sauvegardé: {name} -> {temp_path}")
+
+        job.progress = 5
+        job.step = "Démarrage du rendu..."
+
+        # Lancer le rendu dans un thread séparé
+        render_executor.submit(do_render_job, job_id, request_dict, uploaded_videos)
+
+        # Retourner immédiatement le job_id
+        return {
+            "job_id": job_id,
+            "status": "processing",
+            "message": "Rendu démarré en arrière-plan"
+        }
+
+    except Exception as e:
+        print(f"❌ Erreur lors de la création du job: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+@app.get("/render/status/{job_id}")
+def get_render_status(job_id: str):
+    """Retourne le statut d'un job de rendu"""
+    job = render_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {
+        "id": job.id,
+        "status": job.status,
+        "progress": job.progress,
+        "step": job.step,
+        "total_clips": job.total_clips,
+        "processed_clips": job.processed_clips,
+        "error": job.error
+    }
+
+@app.get("/render/download/{job_id}")
+def download_render(job_id: str):
+    """Télécharge le fichier rendu"""
+    job = render_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail=f"Job not completed: {job.status}")
+    if not os.path.exists(job.output_path):
+        raise HTTPException(status_code=404, detail="Output file not found")
+
+    filename = os.path.basename(job.output_path)
+    return FileResponse(
+        job.output_path,
+        media_type="video/mp4",
+        filename=filename
+    )
+
+async def sse_generator(job_id: str):
+    """Générateur SSE pour la progression du rendu"""
+    while True:
+        job = render_jobs.get(job_id)
+        if not job:
+            yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+            break
+
+        data = {
+            "status": job.status,
+            "progress": job.progress,
+            "step": job.step,
+            "total_clips": job.total_clips,
+            "processed_clips": job.processed_clips
+        }
+
+        if job.status == "completed":
+            data["download_url"] = f"/render/download/{job_id}"
+            yield f"data: {json.dumps(data)}\n\n"
+            break
+        elif job.status == "error":
+            data["error"] = job.error
+            yield f"data: {json.dumps(data)}\n\n"
+            break
+        else:
+            yield f"data: {json.dumps(data)}\n\n"
+            await asyncio.sleep(0.5)  # Poll toutes les 500ms
+
+@app.get("/render/stream/{job_id}")
+async def stream_render_progress(job_id: str):
+    """Stream SSE de la progression du rendu"""
+    job = render_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return StreamingResponse(
+        sse_generator(job_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )

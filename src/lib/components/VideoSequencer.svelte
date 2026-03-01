@@ -6,6 +6,7 @@
 	import TransportControls from './TransportControls.svelte';
 	import InstrumentPanel from './InstrumentPanel.svelte';
 	import GridSizeControl from './GridSizeControl.svelte';
+	import RenderProgressBar from './RenderProgressBar.svelte';
 
 	let fileInput: HTMLInputElement;
 	let jsonFileInput: HTMLInputElement;
@@ -199,6 +200,7 @@
 </script>
 
 <div class="video-sequencer">
+	<RenderProgressBar />
 	<header class="header">
 		<h1>VideoSequencer - Séquenceur Vidéo</h1>
 		<div class="add-instrument">

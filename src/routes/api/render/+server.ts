@@ -29,16 +29,28 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw error(response.status, `Erreur de rendu: ${errorText}`);
 		}
 
-		// Récupérer le fichier vidéo
-		const videoBlob = await response.blob();
+		// Vérifier le type de réponse
+		const contentType = response.headers.get('content-type');
 
-		// Retourner le fichier
-		return new Response(videoBlob, {
-			headers: {
-				'Content-Type': 'video/mp4',
-				'Content-Disposition': `attachment; filename="render_${Date.now()}.mp4"`
-			}
-		});
+		if (contentType?.includes('application/json')) {
+			// Nouvelle API: retourne un job_id pour le suivi de progression
+			const jsonData = await response.json();
+			console.log('📋 Réponse JSON reçue:', jsonData);
+			return new Response(JSON.stringify(jsonData), {
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+		} else {
+			// Ancienne API: retourne directement le fichier vidéo
+			const videoBlob = await response.blob();
+			return new Response(videoBlob, {
+				headers: {
+					'Content-Type': 'video/mp4',
+					'Content-Disposition': `attachment; filename="render_${Date.now()}.mp4"`
+				}
+			});
+		}
 	} catch (err) {
 		console.error('Erreur API render:', err);
 		throw error(500, 'Erreur lors du rendu vidéo');

@@ -33,3 +33,14 @@ export interface PlaybackState {
 	currentBeat: number;
 	activeClips: Set<string>; // IDs des clips en cours de lecture
 }
+
+export interface RenderProgress {
+	isRendering: boolean;
+	jobId: string | null;
+	status: 'idle' | 'processing' | 'completed' | 'error';
+	progress: number; // 0-100
+	step: string;
+	totalClips: number;
+	processedClips: number;
+	error: string | null;
+}

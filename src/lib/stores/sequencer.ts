@@ -3,7 +3,8 @@ import type {
 	SequencerState,
 	PlaybackState,
 	VideoClip,
-	VideoInstrument
+	VideoInstrument,
+	RenderProgress
 } from '$lib/types/sequencer';
 
 // État principal du séquenceur
@@ -25,6 +26,19 @@ export const playbackState = writable<PlaybackState>({
 	currentBeat: 0,
 	activeClips: new Set()
 });
+
+// État de progression du rendu
+const initialRenderProgress: RenderProgress = {
+	isRendering: false,
+	jobId: null,
+	status: 'idle',
+	progress: 0,
+	step: '',
+	totalClips: 0,
+	processedClips: 0,
+	error: null
+};
+export const renderProgress = writable<RenderProgress>(initialRenderProgress);
 
 // Utilitaires pour calculer le temps
 export const timeUtils = {
@@ -422,12 +436,42 @@ export const sequencerActions = {
 				});
 				console.log('✅ Instruments reconstruits:', instruments.length);
 
-				// Restaurer l'état complet
+				// Restaurer les clips en convertissant instrumentId -> gridPosition
 				console.log('🎬 Restauration des clips:', jsonData.clips?.length || 0);
-				jsonData.clips?.forEach((clip: any, index: number) => {
+
+				// Créer un map instrumentId -> instrument pour lookup rapide
+				const instrumentMap = new Map<string, any>();
+				instruments.forEach((inst: any) => {
+					instrumentMap.set(inst.id, inst);
+				});
+
+				const clips = (jsonData.clips || []).map((clip: any, index: number) => {
+					// Trouver l'instrument par instrumentId ou par gridPosition (ancien format)
+					let gridPosition = clip.gridPosition;
+					let trackIndex = clip.trackIndex;
+
+					if (clip.instrumentId) {
+						// Nouveau format avec instrumentId
+						const inst = instrumentMap.get(clip.instrumentId);
+						if (inst) {
+							gridPosition = inst.gridPosition;
+							trackIndex = inst.trackPosition ?? inst.gridPosition;
+						} else {
+							console.warn(`   ⚠️ Clip ${index + 1}: instrument ${clip.instrumentId} non trouvé`);
+						}
+					}
+
 					console.log(
-						`   ${index + 1}. Clip sur gridPosition ${clip.gridPosition}, beat ${clip.startTime}, durée ${clip.duration}`
+						`   ${index + 1}. Clip ${clip.instrumentId || 'grid:' + clip.gridPosition} → gridPosition ${gridPosition}, beat ${clip.startTime}, durée ${clip.duration}`
 					);
+
+					return {
+						id: clip.id,
+						gridPosition: gridPosition ?? 0,
+						startTime: clip.startTime,
+						duration: clip.duration,
+						trackIndex: trackIndex ?? gridPosition ?? 0
+					};
 				});
 
 				console.log('⚙️ Restauration des paramètres:');
@@ -438,7 +482,7 @@ export const sequencerActions = {
 
 				return {
 					instruments,
-					clips: jsonData.clips,
+					clips,
 					isPlaying: false,
 					currentTime: 0,
 					bpm: jsonData.bpm,
@@ -809,6 +853,18 @@ print(f"Fichier: {output_file}")
 
 	renderVideoAPI: async (state: SequencerState) => {
 		try {
+			// Initialiser la progression
+			renderProgress.set({
+				isRendering: true,
+				jobId: null,
+				status: 'processing',
+				progress: 0,
+				step: 'Préparation...',
+				totalClips: state.clips.length,
+				processedClips: 0,
+				error: null
+			});
+
 			// Préparer les données pour l'API
 			const renderData = {
 				bpm: state.bpm,
@@ -820,12 +876,18 @@ print(f"Fichier: {output_file}")
 					offset: inst.offset || 0,
 					maxDuration: inst.maxDuration || 0
 				})),
-				clips: state.clips.map((clip) => ({
-					id: clip.id,
-					gridPosition: clip.gridPosition,
-					startTime: clip.startTime,
-					duration: clip.duration
-				}))
+				clips: state.clips.map((clip) => {
+					// Trouver l'instrument correspondant à la gridPosition du clip
+					const instrument = state.instruments.find(
+						(inst) => inst.gridPosition === clip.gridPosition
+					);
+					return {
+						id: clip.id,
+						instrumentId: instrument?.id || `inst-${clip.gridPosition}`,
+						startTime: clip.startTime,
+						duration: clip.duration
+					};
+				})
 			};
 
 			// Créer un FormData pour envoyer les données + vidéos uploadées
@@ -849,6 +911,8 @@ print(f"Fichier: {output_file}")
 				`📤 Envoi de ${uploadedVideos.length} vidéos uploadées + ${state.instruments.length - uploadedVideos.length} vidéos locales`
 			);
 
+			renderProgress.update((p) => ({ ...p, step: 'Envoi au serveur...' }));
+
 			// Appeler l'API de rendu
 			// Timeout de 30 minutes pour les très longs rendus (nombreux clips)
 			const controller = new AbortController();
@@ -869,20 +933,87 @@ print(f"Fichier: {output_file}")
 				throw new Error(`Erreur HTTP ${response.status}: ${errorText}`);
 			}
 
-			console.log('✅ Réponse reçue, téléchargement du fichier...');
+			// Vérifier si c'est la nouvelle API (JSON avec job_id) ou l'ancienne (blob direct)
+			const contentType = response.headers.get('content-type');
 
-			// Télécharger le fichier vidéo
-			const blob = await response.blob();
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `render_${Date.now()}.mp4`;
-			a.click();
-			URL.revokeObjectURL(url);
+			if (contentType?.includes('application/json')) {
+				// Nouvelle API avec progression
+				const result = await response.json();
+				const jobId = result.job_id;
+
+				renderProgress.update((p) => ({ ...p, jobId, step: 'Rendu en cours...' }));
+
+				// Polling pour suivre la progression
+				let completed = false;
+				while (!completed) {
+					await new Promise((resolve) => setTimeout(resolve, 500)); // Attendre 500ms
+
+					const statusResponse = await fetch(`/api/render/status/${jobId}`);
+					if (!statusResponse.ok) {
+						throw new Error('Erreur lors de la récupération du statut');
+					}
+
+					const status = await statusResponse.json();
+
+					renderProgress.update((p) => ({
+						...p,
+						progress: status.progress,
+						step: status.step,
+						processedClips: status.processed_clips,
+						totalClips: status.total_clips
+					}));
+
+					if (status.status === 'completed') {
+						completed = true;
+						// Télécharger le fichier
+						const downloadResponse = await fetch(`/api/render/download/${jobId}`);
+						if (!downloadResponse.ok) {
+							throw new Error('Erreur lors du téléchargement');
+						}
+						const blob = await downloadResponse.blob();
+						const url = URL.createObjectURL(blob);
+						const a = document.createElement('a');
+						a.href = url;
+						a.download = `render_${Date.now()}.mp4`;
+						a.click();
+						URL.revokeObjectURL(url);
+					} else if (status.status === 'error') {
+						throw new Error(status.error || 'Erreur de rendu');
+					}
+				}
+			} else {
+				// Ancienne API - blob direct (fallback)
+				console.log('✅ Réponse reçue, téléchargement du fichier...');
+				renderProgress.update((p) => ({ ...p, progress: 90, step: 'Téléchargement...' }));
+
+				const blob = await response.blob();
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = `render_${Date.now()}.mp4`;
+				a.click();
+				URL.revokeObjectURL(url);
+			}
+
+			// Marquer comme terminé
+			renderProgress.update((p) => ({
+				...p,
+				isRendering: false,
+				status: 'completed',
+				progress: 100,
+				step: 'Terminé!'
+			}));
 
 			return true;
 		} catch (err) {
 			console.error('Erreur de rendu:', err);
+			renderProgress.update((p) => ({
+				...p,
+				isRendering: false,
+				status: 'error',
+				step: 'Erreur!',
+				error: err instanceof Error ? err.message : 'Erreur inconnue'
+			}));
 			return false;
 		}
 	}
