@@ -1,0 +1,157 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://videosequencer.local/composition.schema.json",
+	"title": "VideoSequencer Composition",
+	"description": "Schema for VideoSequencer composition files",
+	"type": "object",
+	"required": ["bpm", "gridSize", "instruments", "clips"],
+	"properties": {
+		"version": {
+			"type": "string",
+			"description": "Version du format de composition",
+			"default": "1.0"
+		},
+		"name": {
+			"type": "string",
+			"description": "Nom de la composition",
+			"minLength": 1,
+			"maxLength": 100
+		},
+		"description": {
+			"type": "string",
+			"description": "Description de la composition"
+		},
+		"bpm": {
+			"type": "integer",
+			"description": "Tempo en beats par minute",
+			"minimum": 20,
+			"maximum": 300,
+			"default": 120
+		},
+		"totalBeats": {
+			"type": "integer",
+			"description": "Nombre total de beats dans la composition",
+			"minimum": 1,
+			"maximum": 9999
+		},
+		"gridSize": {
+			"type": "object",
+			"description": "Taille de la grille vidéo",
+			"required": ["rows", "cols"],
+			"properties": {
+				"rows": {
+					"type": "integer",
+					"description": "Nombre de lignes",
+					"minimum": 1,
+					"maximum": 10
+				},
+				"cols": {
+					"type": "integer",
+					"description": "Nombre de colonnes",
+					"minimum": 1,
+					"maximum": 10
+				}
+			},
+			"additionalProperties": false
+		},
+		"loopMode": {
+			"type": "boolean",
+			"description": "Activer le mode boucle",
+			"default": false
+		},
+		"instruments": {
+			"type": "array",
+			"description": "Liste des instruments (sources vidéo)",
+			"minItems": 1,
+			"items": {
+				"$ref": "#/$defs/instrument"
+			}
+		},
+		"clips": {
+			"type": "array",
+			"description": "Liste des clips placés sur la timeline",
+			"items": {
+				"$ref": "#/$defs/clip"
+			}
+		}
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"instrument": {
+			"type": "object",
+			"description": "Un instrument représente une source vidéo",
+			"required": ["id", "name", "gridPosition"],
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "Identifiant unique de l'instrument (utilisé par les clips)",
+					"pattern": "^[a-zA-Z0-9_-]+$",
+					"minLength": 1
+				},
+				"name": {
+					"type": "string",
+					"description": "Nom affiché de l'instrument (doit correspondre au nom du fichier vidéo sans extension)",
+					"minLength": 1
+				},
+				"color": {
+					"type": "string",
+					"description": "Couleur d'affichage (format hexadécimal)",
+					"pattern": "^#[0-9a-fA-F]{6}$"
+				},
+				"gridPosition": {
+					"type": "integer",
+					"description": "Position dans la grille (0 = haut-gauche, row*cols+col)",
+					"minimum": 0
+				},
+				"trackPosition": {
+					"type": "integer",
+					"description": "Position de la piste dans la timeline",
+					"minimum": 0
+				},
+				"offset": {
+					"type": "number",
+					"description": "Offset de départ dans la vidéo source (en secondes)",
+					"minimum": 0,
+					"default": 0
+				},
+				"maxDuration": {
+					"type": "number",
+					"description": "Durée maximale utilisable de la vidéo (0 = pas de limite)",
+					"minimum": 0,
+					"default": 0
+				}
+			},
+			"additionalProperties": false
+		},
+		"clip": {
+			"type": "object",
+			"description": "Un clip est une instance d'instrument placée sur la timeline",
+			"required": ["id", "instrumentId", "startTime", "duration"],
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "Identifiant unique du clip",
+					"pattern": "^[a-zA-Z0-9_-]+$",
+					"minLength": 1
+				},
+				"instrumentId": {
+					"type": "string",
+					"description": "Référence à l'id de l'instrument (OBLIGATOIRE pour le rendu)",
+					"pattern": "^[a-zA-Z0-9_-]+$",
+					"minLength": 1
+				},
+				"startTime": {
+					"type": "number",
+					"description": "Temps de début en beats",
+					"minimum": 0
+				},
+				"duration": {
+					"type": "number",
+					"description": "Durée en beats",
+					"exclusiveMinimum": 0
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}

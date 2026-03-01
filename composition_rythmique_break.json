@@ -1,0 +1,1257 @@
+{
+	"version": "1.0",
+	"bpm": 120,
+	"totalBeats": 128,
+	"gridSize": {
+		"rows": 4,
+		"cols": 4
+	},
+	"loopMode": false,
+	"instruments": [
+		{
+			"id": "inst-grosse-caisse",
+			"name": "Grosse Caisse",
+			"color": "#ff6b6b",
+			"gridPosition": 0,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 0
+		},
+		{
+			"id": "inst-caisse-claire",
+			"name": "Caisse Claire",
+			"color": "#4ecdc4",
+			"gridPosition": 1,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 1
+		},
+		{
+			"id": "inst-charleston",
+			"name": "Charleston",
+			"color": "#45b7d1",
+			"gridPosition": 2,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 2
+		},
+		{
+			"id": "inst-shaker",
+			"name": "Shaker",
+			"color": "#96ceb4",
+			"gridPosition": 3,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 3
+		},
+		{
+			"id": "inst-basse-1",
+			"name": "Basse 1",
+			"color": "#ffeaa7",
+			"gridPosition": 4,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 4
+		},
+		{
+			"id": "inst-basse-2",
+			"name": "Basse 2",
+			"color": "#fdcb6e",
+			"gridPosition": 5,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 5
+		},
+		{
+			"id": "inst-pad-1",
+			"name": "Pad 1",
+			"color": "#a29bfe",
+			"gridPosition": 6,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 6
+		},
+		{
+			"id": "inst-pad-2",
+			"name": "Pad 2",
+			"color": "#6c5ce7",
+			"gridPosition": 7,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 7
+		},
+		{
+			"id": "inst-melodie-principale",
+			"name": "Melodie Principale",
+			"color": "#fd79a8",
+			"gridPosition": 8,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 8
+		},
+		{
+			"id": "inst-contre-melodie",
+			"name": "Contre-Melodie",
+			"color": "#e17055",
+			"gridPosition": 9,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 9
+		},
+		{
+			"id": "inst-arpege",
+			"name": "Arpege",
+			"color": "#74b9ff",
+			"gridPosition": 10,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 10
+		},
+		{
+			"id": "inst-riff",
+			"name": "Riff Vocal",
+			"color": "#a29bfe",
+			"gridPosition": 11,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 11
+		},
+		{
+			"id": "inst-souffle",
+			"name": "Souffle Rythmique",
+			"color": "#dfe6e9",
+			"gridPosition": 12,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 12
+		},
+		{
+			"id": "inst-clap",
+			"name": "Clap Collectif",
+			"color": "#fab1a0",
+			"gridPosition": 13,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 13
+		},
+		{
+			"id": "inst-voix-lead",
+			"name": "Voix Lead",
+			"color": "#ff7675",
+			"gridPosition": 14,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 14
+		},
+		{
+			"id": "inst-fx-final",
+			"name": "FX Final",
+			"color": "#fd79a8",
+			"gridPosition": 15,
+			"offset": 0,
+			"maxDuration": 0,
+			"trackPosition": 15
+		}
+	],
+	"clips": [
+		{
+			"id": "c1",
+			"startTime": 0,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c2",
+			"startTime": 2,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c3",
+			"startTime": 4,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c4",
+			"startTime": 6,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c5",
+			"startTime": 8,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c6",
+			"startTime": 10,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c7",
+			"startTime": 12,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c8",
+			"startTime": 14,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c9",
+			"startTime": 16,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c10",
+			"startTime": 18,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c11",
+			"startTime": 20,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c12",
+			"startTime": 22,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c13",
+			"startTime": 24,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c14",
+			"startTime": 26,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c15",
+			"startTime": 28,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c16",
+			"startTime": 30,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c17",
+			"startTime": 32,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c18",
+			"startTime": 34,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c19",
+			"startTime": 36,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c20",
+			"startTime": 38,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c21",
+			"startTime": 40,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c22",
+			"startTime": 42,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c23",
+			"startTime": 44,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c24",
+			"startTime": 46,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c25",
+			"startTime": 1,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c26",
+			"startTime": 3,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c27",
+			"startTime": 5,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c28",
+			"startTime": 7,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c29",
+			"startTime": 9,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c30",
+			"startTime": 11,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c31",
+			"startTime": 13,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c32",
+			"startTime": 15,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c33",
+			"startTime": 17,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c34",
+			"startTime": 19,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c35",
+			"startTime": 21,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c36",
+			"startTime": 23,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c37",
+			"startTime": 25,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c38",
+			"startTime": 27,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c39",
+			"startTime": 29,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c40",
+			"startTime": 31,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c41",
+			"startTime": 33,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c42",
+			"startTime": 35,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c43",
+			"startTime": 37,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c44",
+			"startTime": 39,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c45",
+			"startTime": 41,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c46",
+			"startTime": 43,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c47",
+			"startTime": 45,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c48",
+			"startTime": 47,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c49",
+			"startTime": 0,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c50",
+			"startTime": 2,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c51",
+			"startTime": 4,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c52",
+			"startTime": 6,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c53",
+			"startTime": 8,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c54",
+			"startTime": 10,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c55",
+			"startTime": 12,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c56",
+			"startTime": 14,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c57",
+			"startTime": 16,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c58",
+			"startTime": 18,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c59",
+			"startTime": 20,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c60",
+			"startTime": 22,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c61",
+			"startTime": 24,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c62",
+			"startTime": 26,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c63",
+			"startTime": 28,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c64",
+			"startTime": 30,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c65",
+			"startTime": 32,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c66",
+			"startTime": 34,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c67",
+			"startTime": 36,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c68",
+			"startTime": 38,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c69",
+			"startTime": 40,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c70",
+			"startTime": 42,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c71",
+			"startTime": 44,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c72",
+			"startTime": 46,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c73",
+			"startTime": 20,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c74",
+			"startTime": 28,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c75",
+			"startTime": 36,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c76",
+			"startTime": 44,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "break1",
+			"startTime": 48,
+			"duration": 1,
+			"trackIndex": 13,
+			"gridPosition": 13
+		},
+		{
+			"id": "break2",
+			"startTime": 52,
+			"duration": 1,
+			"trackIndex": 13,
+			"gridPosition": 13
+		},
+		{
+			"id": "break3",
+			"startTime": 50,
+			"duration": 2,
+			"trackIndex": 14,
+			"gridPosition": 14
+		},
+		{
+			"id": "break4",
+			"startTime": 54,
+			"duration": 2,
+			"trackIndex": 14,
+			"gridPosition": 14
+		},
+		{
+			"id": "c77",
+			"startTime": 64,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c78",
+			"startTime": 66,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c79",
+			"startTime": 68,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c80",
+			"startTime": 70,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c81",
+			"startTime": 72,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c82",
+			"startTime": 74,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c83",
+			"startTime": 76,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c84",
+			"startTime": 78,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c85",
+			"startTime": 80,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c86",
+			"startTime": 82,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c87",
+			"startTime": 84,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c88",
+			"startTime": 86,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c89",
+			"startTime": 88,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c90",
+			"startTime": 90,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c91",
+			"startTime": 92,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c92",
+			"startTime": 94,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c93",
+			"startTime": 96,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c94",
+			"startTime": 98,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c95",
+			"startTime": 100,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c96",
+			"startTime": 102,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c97",
+			"startTime": 104,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c98",
+			"startTime": 106,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c99",
+			"startTime": 108,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c100",
+			"startTime": 110,
+			"duration": 1,
+			"trackIndex": 0,
+			"gridPosition": 0
+		},
+		{
+			"id": "c101",
+			"startTime": 65,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c102",
+			"startTime": 67,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c103",
+			"startTime": 69,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c104",
+			"startTime": 71,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c105",
+			"startTime": 73,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c106",
+			"startTime": 75,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c107",
+			"startTime": 77,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c108",
+			"startTime": 79,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c109",
+			"startTime": 81,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c110",
+			"startTime": 83,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c111",
+			"startTime": 85,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c112",
+			"startTime": 87,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c113",
+			"startTime": 89,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c114",
+			"startTime": 91,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c115",
+			"startTime": 93,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c116",
+			"startTime": 95,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c117",
+			"startTime": 97,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c118",
+			"startTime": 99,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c119",
+			"startTime": 101,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c120",
+			"startTime": 103,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c121",
+			"startTime": 105,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c122",
+			"startTime": 107,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c123",
+			"startTime": 109,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c124",
+			"startTime": 111,
+			"duration": 1,
+			"trackIndex": 1,
+			"gridPosition": 1
+		},
+		{
+			"id": "c125",
+			"startTime": 64,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c126",
+			"startTime": 66,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c127",
+			"startTime": 68,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c128",
+			"startTime": 70,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c129",
+			"startTime": 72,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c130",
+			"startTime": 74,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c131",
+			"startTime": 76,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c132",
+			"startTime": 78,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c133",
+			"startTime": 80,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c134",
+			"startTime": 82,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c135",
+			"startTime": 84,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c136",
+			"startTime": 86,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c137",
+			"startTime": 88,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c138",
+			"startTime": 90,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c139",
+			"startTime": 92,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c140",
+			"startTime": 94,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c141",
+			"startTime": 96,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c142",
+			"startTime": 98,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c143",
+			"startTime": 100,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c144",
+			"startTime": 102,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c145",
+			"startTime": 104,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c146",
+			"startTime": 106,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c147",
+			"startTime": 108,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c148",
+			"startTime": 110,
+			"duration": 2,
+			"trackIndex": 2,
+			"gridPosition": 2
+		},
+		{
+			"id": "c149",
+			"startTime": 84,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c150",
+			"startTime": 92,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c151",
+			"startTime": 100,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "c152",
+			"startTime": 108,
+			"duration": 1,
+			"trackIndex": 3,
+			"gridPosition": 3
+		},
+		{
+			"id": "outro1",
+			"startTime": 112,
+			"duration": 16,
+			"trackIndex": 15,
+			"gridPosition": 15
+		}
+	]
+}

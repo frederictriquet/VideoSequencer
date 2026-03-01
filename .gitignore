@@ -49,12 +49,16 @@ ENV/
 
 # VideoSequencer specific
 /output/
-/clips/*.mp4
-/clips/*.webm
-/clips/*.mov
+clips*/
 render-videoSeq.py
 render-videoSeq.sh
-/clips2/
+
+# Video files
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
 
 # Python virtual environments
 render-service/.venv/
