@@ -35,7 +35,10 @@
 			<div
 				class="instrument-item"
 				style="border-left: 3px solid {instrument.color}"
+				role="button"
+				tabindex={index}
 				ondblclick={() => openInstrumentProperties(instrument)}
+				onkeydown={(e) => e.key === 'Enter' && openInstrumentProperties(instrument)}
 				title="Double-clic pour éditer les propriétés"
 			>
 				<div class="instrument-info">

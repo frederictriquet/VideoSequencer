@@ -15,19 +15,27 @@
 		// Vérifier si la dernière colonne est vide
 		const lastCol = $sequencerState.gridSize.cols - 1;
 
-		return !$sequencerState.instruments.some((inst) => inst.gridPosition % $sequencerState.gridSize.cols === lastCol);
+		return !$sequencerState.instruments.some(
+			(inst) => inst.gridPosition % $sequencerState.gridSize.cols === lastCol
+		);
 	}
 
 	function increaseRows() {
 		if ($sequencerState.gridSize.rows < 5) {
-			sequencerActions.setGridSize($sequencerState.gridSize.rows + 1, $sequencerState.gridSize.cols);
+			sequencerActions.setGridSize(
+				$sequencerState.gridSize.rows + 1,
+				$sequencerState.gridSize.cols
+			);
 		}
 	}
 
 	function decreaseRows() {
 		if ($sequencerState.gridSize.rows > 1) {
 			if (canReduceRows()) {
-				sequencerActions.setGridSize($sequencerState.gridSize.rows - 1, $sequencerState.gridSize.cols);
+				sequencerActions.setGridSize(
+					$sequencerState.gridSize.rows - 1,
+					$sequencerState.gridSize.cols
+				);
 			} else {
 				alert('Impossible de réduire : la dernière ligne contient des instruments');
 			}
@@ -36,14 +44,20 @@
 
 	function increaseCols() {
 		if ($sequencerState.gridSize.cols < 5) {
-			sequencerActions.setGridSize($sequencerState.gridSize.rows, $sequencerState.gridSize.cols + 1);
+			sequencerActions.setGridSize(
+				$sequencerState.gridSize.rows,
+				$sequencerState.gridSize.cols + 1
+			);
 		}
 	}
 
 	function decreaseCols() {
 		if ($sequencerState.gridSize.cols > 1) {
 			if (canReduceCols()) {
-				sequencerActions.setGridSize($sequencerState.gridSize.rows, $sequencerState.gridSize.cols - 1);
+				sequencerActions.setGridSize(
+					$sequencerState.gridSize.rows,
+					$sequencerState.gridSize.cols - 1
+				);
 			} else {
 				alert('Impossible de réduire : la dernière colonne contient des instruments');
 			}
@@ -55,7 +69,7 @@
 	<h3>Taille de la grille</h3>
 
 	<div class="control-row">
-		<label class="control-label">Lignes:</label>
+		<label class="control-label" for="rows-value">Lignes:</label>
 		<div class="control-buttons">
 			<button
 				onclick={decreaseRows}
@@ -64,7 +78,7 @@
 			>
 				−
 			</button>
-			<span class="value">{$sequencerState.gridSize.rows}</span>
+			<span class="value" id="rows-value">{$sequencerState.gridSize.rows}</span>
 			<button
 				onclick={increaseRows}
 				class="control-btn"
@@ -76,7 +90,7 @@
 	</div>
 
 	<div class="control-row">
-		<label class="control-label">Colonnes:</label>
+		<label class="control-label" for="cols-value">Colonnes:</label>
 		<div class="control-buttons">
 			<button
 				onclick={decreaseCols}
@@ -85,7 +99,7 @@
 			>
 				−
 			</button>
-			<span class="value">{$sequencerState.gridSize.cols}</span>
+			<span class="value" id="cols-value">{$sequencerState.gridSize.cols}</span>
 			<button
 				onclick={increaseCols}
 				class="control-btn"

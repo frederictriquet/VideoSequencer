@@ -256,6 +256,8 @@
 		<div
 			class="grid-cell"
 			class:drag-over={dragOverPosition === index}
+			role="cell"
+			tabindex={index}
 			style="border: 2px solid {instrument?.color || '#333'}"
 			ondragover={(e) => handleDragOver(e, index)}
 			ondragleave={handleDragLeave}
@@ -264,6 +266,8 @@
 			{#if instrument && instrument.videoUrl}
 				<div
 					class="video-wrapper"
+					role="img"
+					aria-label={instrument.name}
 					draggable="true"
 					ondragstart={(e) => handleDragStart(e, instrument.id)}
 					ondragend={handleDragEnd}

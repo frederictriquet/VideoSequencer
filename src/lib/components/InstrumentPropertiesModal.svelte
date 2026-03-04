@@ -124,7 +124,14 @@
 	role="button"
 	tabindex="-1"
 >
-	<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+	<div
+		class="modal-content"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => e.stopPropagation()}
+		onkeydown={(e) => e.stopPropagation()}
+	>
 		<h3>Propriétés de l'Instrument</h3>
 
 		<div class="property-group">
@@ -139,9 +146,10 @@
 
 		{#if instrument.videoUrl}
 			<div class="preview-section">
-				<label>Prévisualisation:</label>
+				<label for="preview-video">Prévisualisation:</label>
 				<div class="video-preview">
 					<video
+						id="preview-video"
 						bind:this={videoElement}
 						src={instrument.videoUrl}
 						class="preview-video"
@@ -182,10 +190,11 @@
 
 		{#if videoDuration > 0}
 			<div class="property-group">
-				<label>Portion de vidéo utilisée:</label>
+				<label for="slider-start">Portion de vidéo utilisée:</label>
 				<div class="range-slider-container">
 					<div class="range-slider">
 						<input
+							id="slider-start"
 							type="range"
 							value={sliderStart}
 							oninput={handleStartChange}

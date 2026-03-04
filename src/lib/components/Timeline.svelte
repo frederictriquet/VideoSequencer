@@ -299,6 +299,8 @@
 <div class="timeline-container">
 	<div
 		class="tracks-wrapper"
+		role="region"
+		aria-label="Timeline"
 		bind:this={tracksContainer}
 		onmousemove={handleTracksMouseMove}
 		onmouseleave={handleTracksMouseLeave}
@@ -321,6 +323,8 @@
 			{#each tracks as track (track.instrument.id)}
 				<div
 					class="track"
+					role="row"
+					tabindex={track.index}
 					style="height: {TRACK_HEIGHT}px; border-left: 3px solid {track.instrument.color};"
 					onmousedown={(e) => handleTrackMouseDown(e, track.index, track.instrument.id)}
 				>
