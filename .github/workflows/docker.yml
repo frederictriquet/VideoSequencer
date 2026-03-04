@@ -1,12 +1,7 @@
 name: Docker Build & Publish
 
 on:
-  push:
-    branches:
-      - '**'
-  pull_request:
-    branches:
-      - '**'
+  workflow_dispatch:
 
 permissions:
   contents: write

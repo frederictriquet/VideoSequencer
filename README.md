@@ -1,5 +1,8 @@
 # VideoSequencer
 
+[![CI](https://github.com/frederictriquet/VideoSequencer/actions/workflows/ci.yml/badge.svg)](https://github.com/frederictriquet/VideoSequencer/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/frederictriquet/VideoSequencer/branch/master/graph/badge.svg)](https://codecov.io/gh/frederictriquet/VideoSequencer)
+
 Séquenceur vidéo interactif basé sur un timeline à la mesure. Compose des vidéos en plaçant des clips sur une grille NxN synchronisée au BPM.
 
 ## Stack

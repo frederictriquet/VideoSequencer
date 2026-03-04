@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { sequencerState, sequencerActions, timeUtils } from './sequencer';
+import { sequencerState, sequencerActions, timeUtils, renderProgress } from './sequencer';
 
 describe('timeUtils', () => {
 	it('converts beats to seconds correctly', () => {
@@ -382,6 +382,64 @@ describe('sequencerState', () => {
 		});
 	});
 
+	describe('updateInstrument', () => {
+		it('updates instrument properties', () => {
+			sequencerActions.addInstrument('Kick', null, 'url1');
+			const id = get(sequencerState).instruments[0].id;
+
+			sequencerActions.updateInstrument(id, { name: 'BassDrum', offset: 1.5 });
+
+			const state = get(sequencerState);
+			expect(state.instruments[0].name).toBe('BassDrum');
+			expect(state.instruments[0].offset).toBe(1.5);
+		});
+
+		it('does not modify other instruments', () => {
+			sequencerActions.addInstrument('Kick', null, 'url1');
+			sequencerActions.addInstrument('Snare', null, 'url2');
+			const kickId = get(sequencerState).instruments[0].id;
+
+			sequencerActions.updateInstrument(kickId, { name: 'BassDrum' });
+
+			expect(get(sequencerState).instruments[1].name).toBe('Snare');
+		});
+	});
+
+	describe('addClip edge cases', () => {
+		it('does nothing when instrument is not found', () => {
+			sequencerActions.addClip('non-existent-id', 0, 4, 0);
+			expect(get(sequencerState).clips).toHaveLength(0);
+		});
+	});
+
+	describe('moveInstrumentToPosition edge cases', () => {
+		it('does nothing for negative position', () => {
+			sequencerActions.addInstrument('Kick', null, 'url1');
+			const id = get(sequencerState).instruments[0].id;
+
+			sequencerActions.moveInstrumentToPosition(id, -1);
+
+			expect(get(sequencerState).instruments[0].gridPosition).toBe(0);
+		});
+
+		it('does nothing for position beyond grid bounds', () => {
+			sequencerActions.addInstrument('Kick', null, 'url1');
+			const id = get(sequencerState).instruments[0].id;
+
+			sequencerActions.moveInstrumentToPosition(id, 100);
+
+			expect(get(sequencerState).instruments[0].gridPosition).toBe(0);
+		});
+
+		it('does nothing when instrument is not found', () => {
+			sequencerActions.addInstrument('Kick', null, 'url1');
+
+			sequencerActions.moveInstrumentToPosition('non-existent-id', 1);
+
+			expect(get(sequencerState).instruments[0].gridPosition).toBe(0);
+		});
+	});
+
 	describe('CSV export/import', () => {
 		it('exportToCSV generates valid CSV content', () => {
 			// Ajouter des instruments
@@ -490,6 +548,470 @@ Snare,,,X,,,X,`;
 				expect(state.gridSize.rows).toBe(testCase.expectedGrid);
 				expect(state.gridSize.cols).toBe(testCase.expectedGrid);
 			}
+		});
+
+		it('importFromCSV matches instruments with available video files', async () => {
+			global.fetch = async () =>
+				({
+					ok: true,
+					json: async () => ({ files: ['Kick.mp4', 'Snare.mov'] })
+				}) as Response;
+
+			const csv = `Instrument,0,0.5
+Kick,X,
+Snare,,X`;
+
+			await sequencerActions.importFromCSV(csv);
+
+			const state = get(sequencerState);
+			const kick = state.instruments.find((i) => i.name === 'Kick');
+			const snare = state.instruments.find((i) => i.name === 'Snare');
+			expect(kick?.videoUrl).toBe('/api/clips/Kick.mp4');
+			expect(snare?.videoUrl).toBe('/api/clips/Snare.mov');
+		});
+
+		it('importFromCSV revokes old instrument URLs on re-import', async () => {
+			const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+			// Premier import avec instruments ayant des videoUrls
+			sequencerActions.addInstrument('OldInst', null, 'blob:old-url');
+
+			global.fetch = async () =>
+				({
+					ok: true,
+					json: async () => ({ files: [] })
+				}) as Response;
+
+			const csv = `Instrument,0\nNewInst,X`;
+			await sequencerActions.importFromCSV(csv);
+
+			expect(revokeObjectURL).toHaveBeenCalledWith('blob:old-url');
+			revokeObjectURL.mockRestore();
+		});
+	});
+
+	describe('exportToJSON', () => {
+		let mockCreateObjectURL: ReturnType<typeof vi.spyOn>;
+		let mockRevokeObjectURL: ReturnType<typeof vi.spyOn>;
+		let mockClick: ReturnType<typeof vi.fn>;
+
+		beforeEach(() => {
+			mockClick = vi.fn();
+			mockCreateObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-json');
+			mockRevokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+			vi.spyOn(document, 'createElement').mockReturnValue({
+				href: '',
+				download: '',
+				click: mockClick
+			} as unknown as HTMLAnchorElement);
+		});
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('triggers a download', () => {
+			const state = get(sequencerState);
+			sequencerActions.exportToJSON(state);
+
+			expect(mockCreateObjectURL).toHaveBeenCalled();
+			expect(mockClick).toHaveBeenCalled();
+			expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-json');
+		});
+
+		it('exports correct JSON structure', async () => {
+			let capturedBlob: Blob | null = null;
+			mockCreateObjectURL.mockImplementation((blob: Blob) => {
+				capturedBlob = blob;
+				return 'blob:mock-json';
+			});
+
+			sequencerActions.addInstrument('Kick', null, null);
+			const state1 = get(sequencerState);
+			sequencerActions.addClip(state1.instruments[0].id, 0, 4, 0);
+			const state = get(sequencerState);
+
+			sequencerActions.exportToJSON(state);
+
+			const text = await capturedBlob!.text();
+			const data = JSON.parse(text);
+
+			expect(data.version).toBe('1.0');
+			expect(data.bpm).toBe(state.bpm);
+			expect(data.instruments).toHaveLength(1);
+			expect(data.instruments[0].name).toBe('Kick');
+			expect(data.clips).toHaveLength(1);
+		});
+	});
+
+	describe('importFromJSON', () => {
+		beforeEach(() => {
+			global.fetch = async () =>
+				({
+					ok: true,
+					json: async () => ({ files: ['Kick.mp4'] })
+				}) as Response;
+		});
+
+		it('imports valid JSON successfully', async () => {
+			const jsonData = {
+				version: '1.0',
+				bpm: 140,
+				totalBeats: 32,
+				gridSize: { rows: 2, cols: 2 },
+				loopMode: true,
+				instruments: [
+					{
+						id: 'inst-1',
+						name: 'Kick',
+						color: '#ff0000',
+						gridPosition: 0,
+						trackPosition: 0,
+						offset: 0,
+						maxDuration: 0
+					}
+				],
+				clips: [{ id: 'clip-1', gridPosition: 0, startTime: 0, duration: 0.5, trackIndex: 0 }]
+			};
+
+			const result = await sequencerActions.importFromJSON(jsonData);
+
+			expect(result).toBe(true);
+			const state = get(sequencerState);
+			expect(state.bpm).toBe(140);
+			expect(state.totalBeats).toBe(32);
+			expect(state.loopMode).toBe(true);
+			expect(state.instruments).toHaveLength(1);
+			expect(state.instruments[0].name).toBe('Kick');
+			expect(state.instruments[0].videoUrl).toBe('/api/clips/Kick.mp4');
+			expect(state.clips).toHaveLength(1);
+		});
+
+		it('returns false when version field is missing', async () => {
+			const result = await sequencerActions.importFromJSON({ bpm: 120 });
+			expect(result).toBe(false);
+		});
+
+		it('returns false when version is unsupported', async () => {
+			const result = await sequencerActions.importFromJSON({ version: '2.0' });
+			expect(result).toBe(false);
+		});
+
+		it('returns false when fetch fails', async () => {
+			global.fetch = async () => ({ ok: false, status: 500 }) as Response;
+
+			const jsonData = {
+				version: '1.0',
+				bpm: 120,
+				totalBeats: 64,
+				gridSize: { rows: 3, cols: 3 },
+				instruments: [],
+				clips: []
+			};
+			const result = await sequencerActions.importFromJSON(jsonData);
+			expect(result).toBe(false);
+		});
+
+		it('handles clips with instrumentId (new format)', async () => {
+			const jsonData = {
+				version: '1.0',
+				bpm: 120,
+				totalBeats: 64,
+				gridSize: { rows: 2, cols: 2 },
+				loopMode: false,
+				instruments: [
+					{
+						id: 'inst-1',
+						name: 'Snare',
+						color: '#00ff00',
+						gridPosition: 1,
+						trackPosition: 1,
+						offset: 0,
+						maxDuration: 0
+					}
+				],
+				clips: [
+					{ id: 'clip-1', instrumentId: 'inst-1', startTime: 2, duration: 0.5, trackIndex: 1 }
+				]
+			};
+
+			await sequencerActions.importFromJSON(jsonData);
+
+			const state = get(sequencerState);
+			expect(state.clips[0].gridPosition).toBe(1);
+		});
+
+		it('revokes old instrument URLs on import', async () => {
+			const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+			sequencerActions.addInstrument('OldInst', null, 'blob:old-url');
+
+			const jsonData = {
+				version: '1.0',
+				bpm: 120,
+				totalBeats: 64,
+				gridSize: { rows: 1, cols: 1 },
+				loopMode: false,
+				instruments: [],
+				clips: []
+			};
+
+			await sequencerActions.importFromJSON(jsonData);
+
+			expect(revokeObjectURL).toHaveBeenCalledWith('blob:old-url');
+			revokeObjectURL.mockRestore();
+		});
+	});
+
+	describe('exportToCSV', () => {
+		let mockCreateObjectURL: ReturnType<typeof vi.spyOn>;
+		let mockRevokeObjectURL: ReturnType<typeof vi.spyOn>;
+		let mockClick: ReturnType<typeof vi.fn>;
+
+		beforeEach(() => {
+			mockClick = vi.fn();
+			mockCreateObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-csv');
+			mockRevokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+			vi.spyOn(document, 'createElement').mockReturnValue({
+				href: '',
+				download: '',
+				click: mockClick
+			} as unknown as HTMLAnchorElement);
+		});
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('triggers a download', () => {
+			const state = get(sequencerState);
+			sequencerActions.exportToCSV(state);
+
+			expect(mockCreateObjectURL).toHaveBeenCalled();
+			expect(mockClick).toHaveBeenCalled();
+			expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-csv');
+		});
+
+		it('generates correct CSV content', async () => {
+			let capturedBlob: Blob | null = null;
+			mockCreateObjectURL.mockImplementation((blob: Blob) => {
+				capturedBlob = blob;
+				return 'blob:mock-csv';
+			});
+
+			sequencerActions.addInstrument('Kick', null, null);
+			sequencerActions.addInstrument('Snare', null, null);
+			const state1 = get(sequencerState);
+			sequencerActions.addClip(state1.instruments[0].id, 0, 0.5, 0);
+			sequencerActions.addClip(state1.instruments[1].id, 1, 0.5, 1);
+			const state = get(sequencerState);
+
+			sequencerActions.exportToCSV(state);
+
+			const text = await capturedBlob!.text();
+			expect(text).toContain('Instrument,');
+			expect(text).toContain('Kick');
+			expect(text).toContain('Snare');
+			expect(text).toContain('X');
+		});
+
+		it('handles empty state without clips', async () => {
+			let capturedBlob: Blob | null = null;
+			mockCreateObjectURL.mockImplementation((blob: Blob) => {
+				capturedBlob = blob;
+				return 'blob:mock-csv';
+			});
+
+			sequencerActions.addInstrument('Kick', null, null);
+			const state = get(sequencerState);
+
+			sequencerActions.exportToCSV(state);
+
+			const text = await capturedBlob!.text();
+			expect(text).toContain('Instrument,');
+			expect(text).toContain('Kick');
+		});
+	});
+
+	describe('generateFFmpegScript', () => {
+		beforeEach(() => {
+			vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-py');
+			vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+			vi.spyOn(document, 'createElement').mockReturnValue({
+				href: '',
+				download: '',
+				click: vi.fn()
+			} as unknown as HTMLAnchorElement);
+		});
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('generates a Python script with correct configuration', () => {
+			const state = get(sequencerState);
+			const script = sequencerActions.generateFFmpegScript(state);
+
+			expect(script).toContain('#!/usr/bin/env python3');
+			expect(script).toContain(`BPM: ${state.bpm}`);
+			expect(script).toContain(`${state.gridSize.cols}x${state.gridSize.rows}`);
+			expect(script).toContain('from moviepy import');
+		});
+
+		it('includes clip data for each instrument', () => {
+			sequencerActions.addInstrument('Kick', null, null);
+			const state1 = get(sequencerState);
+			sequencerActions.addClip(state1.instruments[0].id, 0, 4, 0);
+			const state = get(sequencerState);
+
+			const script = sequencerActions.generateFFmpegScript(state);
+
+			expect(script).toContain('Kick');
+			expect(script).toContain('video0');
+			expect(script).toContain('clips.append(video0)');
+		});
+
+		it('generates static frames for each instrument', () => {
+			sequencerActions.addInstrument('HiHat', null, null);
+			const state = get(sequencerState);
+
+			const script = sequencerActions.generateFFmpegScript(state);
+
+			expect(script).toContain('HiHat');
+			expect(script).toContain('static_frames');
+		});
+
+		it('uses maxDuration when set', () => {
+			sequencerActions.addInstrument('Bass', null, null);
+			const state1 = get(sequencerState);
+			sequencerActions.updateInstrument(state1.instruments[0].id, { maxDuration: 2.5 });
+			sequencerActions.addClip(state1.instruments[0].id, 0, 4, 0);
+			const state = get(sequencerState);
+
+			const script = sequencerActions.generateFFmpegScript(state);
+
+			expect(script).toContain('2.500');
+		});
+
+		it('triggers download', () => {
+			const mockClick = vi.fn();
+			vi.spyOn(document, 'createElement').mockReturnValue({
+				href: '',
+				download: '',
+				click: mockClick
+			} as unknown as HTMLAnchorElement);
+
+			const state = get(sequencerState);
+			sequencerActions.generateFFmpegScript(state);
+
+			expect(mockClick).toHaveBeenCalled();
+		});
+	});
+
+	describe('renderVideoAPI', () => {
+		beforeEach(() => {
+			vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-video');
+			vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+			vi.spyOn(document, 'createElement').mockReturnValue({
+				href: '',
+				download: '',
+				click: vi.fn()
+			} as unknown as HTMLAnchorElement);
+
+			// Réinitialiser renderProgress
+			renderProgress.set({
+				isRendering: false,
+				jobId: null,
+				status: 'idle',
+				progress: 0,
+				step: '',
+				totalClips: 0,
+				processedClips: 0,
+				error: null
+			});
+		});
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('returns true and triggers download on successful blob response', async () => {
+			global.fetch = async () =>
+				({
+					ok: true,
+					headers: { get: () => 'video/mp4' },
+					blob: async () => new Blob(['fake-video'], { type: 'video/mp4' })
+				}) as unknown as Response;
+
+			const state = get(sequencerState);
+			const result = await sequencerActions.renderVideoAPI(state);
+
+			expect(result).toBe(true);
+			const progress = get(renderProgress);
+			expect(progress.isRendering).toBe(false);
+			expect(progress.status).toBe('completed');
+		});
+
+		it('returns false on HTTP error', async () => {
+			global.fetch = async () =>
+				({
+					ok: false,
+					status: 500,
+					text: async () => 'Internal Server Error'
+				}) as unknown as Response;
+
+			const state = get(sequencerState);
+			const result = await sequencerActions.renderVideoAPI(state);
+
+			expect(result).toBe(false);
+			const progress = get(renderProgress);
+			expect(progress.status).toBe('error');
+			expect(progress.error).toContain('500');
+		});
+
+		it('sets isRendering to true during render', async () => {
+			let resolveRender: () => void;
+			const renderPromise = new Promise<void>((resolve) => {
+				resolveRender = resolve;
+			});
+
+			global.fetch = async () => {
+				await renderPromise;
+				return {
+					ok: true,
+					headers: { get: () => 'video/mp4' },
+					blob: async () => new Blob(['fake-video'])
+				} as unknown as Response;
+			};
+
+			const renderCall = sequencerActions.renderVideoAPI(get(sequencerState));
+			// Vérifier que isRendering est true pendant le rendu
+			expect(get(renderProgress).isRendering).toBe(true);
+
+			resolveRender!();
+			await renderCall;
+		});
+
+		it('includes uploaded video files in FormData', async () => {
+			let capturedFormData: FormData | null = null;
+			global.fetch = async (_url: string | URL | Request, options?: RequestInit) => {
+				capturedFormData = options?.body as FormData;
+				return {
+					ok: true,
+					headers: { get: () => 'video/mp4' },
+					blob: async () => new Blob(['fake-video'])
+				} as unknown as Response;
+			};
+
+			const mockFile = new File(['video-data'], 'kick.mp4', { type: 'video/mp4' });
+			sequencerActions.addInstrument('Kick', mockFile, null);
+			const state = get(sequencerState);
+
+			await sequencerActions.renderVideoAPI(state);
+
+			expect(capturedFormData).not.toBeNull();
+			expect(capturedFormData!.has('data')).toBe(true);
+			expect(capturedFormData!.has('videos')).toBe(true);
 		});
 	});
 });
